@@ -122,6 +122,23 @@ def test_news_date_range_includes_full_to_date(integration_client):
     assert body["items"][0]["url"] == "https://example.com/news/int-boundary-1"
 
 
+def test_news_search_matches_non_contiguous_terms_via_fts(integration_client):
+    payload = {
+        "source": "integration-search",
+        "title": "committee budget briefing",
+        "url": "https://example.com/news/int-search-1",
+        "published_at": "2026-02-17T10:00:00Z",
+        "content": "budget policy report and follow-up details",
+    }
+    saved = integration_client.post("/api/news", json=payload)
+    assert saved.status_code == 201
+
+    listed = integration_client.get("/api/news", params={"q": "budget details"})
+    assert listed.status_code == 200
+    assert listed.json()["total"] == 1
+    assert listed.json()["items"][0]["url"] == "https://example.com/news/int-search-1"
+
+
 def test_minutes_upsert_and_filter(integration_client):
     payload = {
         "council": "seoul",
@@ -140,6 +157,25 @@ def test_minutes_upsert_and_filter(integration_client):
     assert listed.status_code == 200
     assert listed.json()["total"] == 1
     assert listed.json()["items"][0]["council"] == "seoul"
+
+
+def test_minutes_search_matches_non_contiguous_terms_via_fts(integration_client):
+    payload = {
+        "council": "seoul",
+        "committee": "transport",
+        "session": "301",
+        "meeting_no": "301 5th",
+        "url": "https://example.com/minutes/int-search-1",
+        "meeting_date": "2026-02-17",
+        "content": "agenda review with multi-step voting outcome",
+    }
+    saved = integration_client.post("/api/minutes", json=payload)
+    assert saved.status_code == 201
+
+    listed = integration_client.get("/api/minutes", params={"q": "agenda outcome"})
+    assert listed.status_code == 200
+    assert listed.json()["total"] == 1
+    assert listed.json()["items"][0]["url"] == "https://example.com/minutes/int-search-1"
 
 
 def test_minutes_batch_with_duplicate_url_is_stable(integration_client):
@@ -171,6 +207,28 @@ def test_minutes_batch_with_duplicate_url_is_stable(integration_client):
     assert listed.status_code == 200
     assert listed.json()["total"] == 1
     assert listed.json()["items"][0]["committee"] == "plenary"
+
+
+def test_segments_search_matches_non_contiguous_terms_via_fts(integration_client):
+    payload = {
+        "council": "seoul",
+        "committee": "budget",
+        "session": "301",
+        "meeting_no": "301 4th",
+        "meeting_date": "2026-02-17",
+        "summary": "finance committee hearing",
+        "subject": "timeline update",
+        "content": "segment integration with detailed notes",
+        "importance": 2,
+        "party": "party-a",
+    }
+    saved = integration_client.post("/api/segments", json=payload)
+    assert saved.status_code == 201
+
+    listed = integration_client.get("/api/segments", params={"q": "finance update"})
+    assert listed.status_code == 200
+    assert listed.json()["total"] == 1
+    assert listed.json()["items"][0]["party"] == "party-a"
 
 
 def test_segments_insert_and_filter(integration_client):

@@ -100,7 +100,8 @@
 
 ### GET `/api/news`
 - 쿼리: `q`, `source`, `from`, `to`, `page`, `size`
-- 검색(`q`): `title`, `summary`, `content` (`ILIKE`)
+- 검색(`q`): `title`, `summary`, `content`
+  - trigram(`ILIKE` + `pg_trgm`) + FTS(`to_tsvector/websearch_to_tsquery`) 분리 전략 사용
 - 날짜 필터: `from`/`to`는 `YYYY-MM-DD` 형식 검증 후 `published_at` 기준 필터
   - `from`: 해당 날짜 00:00:00부터 포함
   - `to`: 해당 날짜 23:59:59까지 포함(일 단위 inclusive)
@@ -137,7 +138,8 @@
 
 ### GET `/api/minutes`
 - 쿼리: `q`, `council`, `committee`, `session`, `meeting_no`, `from`, `to`, `page`, `size`
-- 검색(`q`): `council`, `committee`, `session`, `content`, `agenda::text` (`ILIKE`)
+- 검색(`q`): `council`, `committee`, `session`, `content`, `agenda::text`
+  - trigram(`ILIKE` + `pg_trgm`) + FTS(`to_tsvector/websearch_to_tsquery`) 분리 전략 사용
 - 날짜 필터: `from`/`to`는 `YYYY-MM-DD` 형식 검증 후 `meeting_date` 기준 필터
 
 목록 응답 `items[*]`:
@@ -172,6 +174,7 @@
 - 검색(`q`):
   - 텍스트: `council`, `committee`, `session`, `content`, `summary`, `subject`, `party`, `constituency`, `department`
   - JSONB 텍스트화: `tag`, `questioner`, `answerer`
+  - trigram(`ILIKE` + `pg_trgm`) + FTS(`to_tsvector/websearch_to_tsquery`) 분리 전략 사용
 - 날짜 필터: `from`/`to`는 `YYYY-MM-DD` 형식 검증 후 `meeting_date` 기준 필터
 
 목록 응답 `items[*]`:

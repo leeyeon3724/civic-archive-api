@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from sqlalchemy import Date, Text, bindparam, cast, column, func, or_, select, table, text
+from sqlalchemy import Date, bindparam, cast, column, func, select, table, text
 
 from app.repositories.common import dedupe_rows_by_key, execute_filtered_paginated_query, to_json_recordset
+from app.repositories.search import build_split_search_condition, build_split_search_params
 from app.repositories.session_provider import ConnectionProvider, open_connection_scope
 
 NEWS_ARTICLES = table(
@@ -106,15 +107,16 @@ def list_articles(
     params: dict[str, Any] = {}
 
     if q:
-        q_bind: Any = bindparam("q")
         conditions.append(
-            or_(
-                cast(NEWS_ARTICLES.c.title, Text).ilike(q_bind),
-                cast(NEWS_ARTICLES.c.summary, Text).ilike(q_bind),
-                cast(NEWS_ARTICLES.c.content, Text).ilike(q_bind),
+            build_split_search_condition(
+                columns=[
+                    NEWS_ARTICLES.c.title,
+                    NEWS_ARTICLES.c.summary,
+                    NEWS_ARTICLES.c.content,
+                ]
             )
         )
-        params["q"] = f"%{q}%"
+        params.update(build_split_search_params(q))
 
     if source:
         conditions.append(NEWS_ARTICLES.c.source == bindparam("source"))

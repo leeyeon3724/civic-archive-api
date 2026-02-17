@@ -63,7 +63,8 @@ migrations/
 └── versions/
     ├── 35f43b134803_initial_schema.py
     ├── 0df9d6f13c5a_add_segments_dedupe_hash.py
-    └── 9c4f6e1a2b7d_make_news_published_at_timestamptz.py
+    ├── 9c4f6e1a2b7d_make_news_published_at_timestamptz.py
+    └── b7d1c2a4e8f9_add_search_strategy_indexes.py
 scripts/
 ├── bootstrap_db.py      # alembic upgrade head 실행
 ├── benchmark_queries.py # 대표 조회 쿼리 성능 회귀 체크
@@ -128,7 +129,8 @@ ASGI 엔트리포인트: `app.main:app`
 
 - PostgreSQL upsert: `ON CONFLICT ... DO UPDATE`
 - 배치 ingest 최적화: `jsonb_to_recordset` 기반 단일 SQL 실행(뉴스/회의록 upsert, 세그먼트 insert)
-- 검색: 텍스트 `ILIKE`, JSONB 컬럼은 `CAST(... AS TEXT) ILIKE`로 통합 검색
+- 검색: trigram(`ILIKE` + `pg_trgm`) + FTS(`to_tsvector/websearch_to_tsquery`) 분리 전략
+- 검색 인덱스: 주요 조회 테이블별 GIN trigram index + GIN FTS index + 필터/정렬 복합 btree index
 - 목록 total: `COUNT(*)` 별도 쿼리
 - 요청/응답 검증: FastAPI + Pydantic 모델 기반으로 OpenAPI 자동 문서화
 - 에러 표준화: `code/message/error/request_id/details` 단일 포맷

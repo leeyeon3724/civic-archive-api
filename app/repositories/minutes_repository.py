@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from sqlalchemy import Text, bindparam, cast, column, func, or_, select, table, text
+from sqlalchemy import bindparam, column, func, select, table, text
 
 from app.repositories.common import (
     add_truthy_equals_filter,
@@ -10,6 +10,7 @@ from app.repositories.common import (
     execute_filtered_paginated_query,
     to_json_recordset,
 )
+from app.repositories.search import build_split_search_condition, build_split_search_params
 from app.repositories.session_provider import ConnectionProvider, open_connection_scope
 
 COUNCIL_MINUTES = table(
@@ -136,17 +137,18 @@ def list_minutes(
     params: dict[str, Any] = {}
 
     if q:
-        q_bind: Any = bindparam("q")
         conditions.append(
-            or_(
-                cast(COUNCIL_MINUTES.c.council, Text).ilike(q_bind),
-                cast(COUNCIL_MINUTES.c.committee, Text).ilike(q_bind),
-                cast(COUNCIL_MINUTES.c["session"], Text).ilike(q_bind),
-                cast(COUNCIL_MINUTES.c.content, Text).ilike(q_bind),
-                cast(COUNCIL_MINUTES.c.agenda, Text).ilike(q_bind),
+            build_split_search_condition(
+                columns=[
+                    COUNCIL_MINUTES.c.council,
+                    COUNCIL_MINUTES.c.committee,
+                    COUNCIL_MINUTES.c["session"],
+                    COUNCIL_MINUTES.c.content,
+                    COUNCIL_MINUTES.c.agenda,
+                ]
             )
         )
-        params["q"] = f"%{q}%"
+        params.update(build_split_search_params(q))
 
     for param_name, column_expr, value in (
         ("council", COUNCIL_MINUTES.c.council, council),

@@ -234,6 +234,7 @@ def test_list_news_returns_paginated_payload(client, use_stub_connection_provide
     assert first_select_params["limit"] == 1
     assert first_select_params["offset"] == 1
     assert first_select_params["q"] == "%budget%"
+    assert first_select_params["q_fts"] == "budget"
 
 
 def test_get_news_404_when_not_found(client, use_stub_connection_provider):

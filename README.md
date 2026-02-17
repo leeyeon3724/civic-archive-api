@@ -20,6 +20,9 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000
 
 # 5) Docker Compose (PostgreSQL + API)
 docker compose up --build
+
+# 6) Production 안전 기본값 Compose (strict security on)
+docker compose -f docker-compose.prod.yml up --build -d
 ```
 
 ## 환경 변수
@@ -142,7 +145,7 @@ python -m pytest -q -m "not e2e and not integration" --cov=app --cov-report=term
 # 커밋 메시지 정책 검사 (브랜치 기준)
 python scripts/check_commit_messages.py --rev-range origin/main..HEAD --mode fail
 
-# 문서-코드 라우트 계약 검사 (API.md 기준 + README 링크 확인)
+# 문서-코드 라우트 계약 검사 (라우터 자동 탐색 + API.md + README 링크 확인)
 python scripts/check_docs_routes.py
 
 # 스키마 정책 검사 (런타임 수동 DDL 금지)
@@ -186,6 +189,7 @@ E2E_REQUIRE_TARGET=1 python -m pytest -q -m e2e --base-url http://localhost:8000
 ## 성능 회귀 체크
 
 대표 조회 쿼리 3종(news/minutes/segments) 응답시간을 측정합니다.
+검색 전략은 trigram(`ILIKE` + `pg_trgm`) + FTS(`to_tsvector/websearch_to_tsquery`) 분리 방식입니다.
 
 ```bash
 # staging 프로파일 + 평균/95퍼센타일 공통 임계값(ms) 초과 시 실패

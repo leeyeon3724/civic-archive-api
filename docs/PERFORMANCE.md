@@ -12,6 +12,16 @@
 - 기본 seed 데이터: 300 rows/scenario
 - 기본 반복 횟수: 25 runs/scenario
 
+## Search Query Strategy
+
+- 검색 조건(`q`)은 단일 `ILIKE`에서 분리 전략으로 전환:
+  - trigram 경로: `ILIKE` + `pg_trgm` GIN 인덱스
+  - FTS 경로: `to_tsvector('simple', ...) @@ websearch_to_tsquery('simple', :q)` + GIN 인덱스
+- 테이블별 공통 검색 문서 표현식에 맞춰 아래 인덱스를 운영:
+  - `*_search_trgm` (GIN + `gin_trgm_ops`)
+  - `*_search_fts` (GIN + `to_tsvector`)
+- 필터+정렬 경로 안정화를 위해 `*_filters_date_id`, `*_date_id` 복합 btree 인덱스를 함께 사용
+
 ## Endpoint Latency Budget
 
 | Scenario | Endpoint | Budget Type | Target |

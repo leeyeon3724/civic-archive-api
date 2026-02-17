@@ -71,6 +71,14 @@ Runtime checks:
   - confirm `413 PAYLOAD_TOO_LARGE` is returned for request size violations
   - confirm batch ingest limit blocks oversized list payloads
 
+Production compose baseline:
+
+- `docker compose -f docker-compose.prod.yml up -d --build`
+- required secrets/env:
+  - `POSTGRES_PASSWORD`
+  - `API_KEY`
+  - `JWT_SECRET` (minimum 32 bytes)
+
 Performance regression:
 
 - `BENCH_PROFILE=staging BENCH_FAIL_THRESHOLD_MS=250 BENCH_FAIL_P95_THRESHOLD_MS=400 python scripts/benchmark_queries.py`

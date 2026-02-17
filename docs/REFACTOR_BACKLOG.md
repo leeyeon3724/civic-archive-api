@@ -405,6 +405,52 @@
   - accidental behavior drift in auth/rate-limit edge cases
   - import cycle risk while extracting shared helpers
 
+### Ticket P1-3: Search Strategy Split and Index Redesign
+
+- Priority: P1
+- Status: Completed
+- Tasks:
+  - [x] split search condition into trigram(`ILIKE` + `pg_trgm`) and FTS(`to_tsvector/websearch_to_tsquery`)
+  - [x] add table-level `*_search_trgm`/`*_search_fts` GIN indexes for news/minutes/segments
+  - [x] add filter+sort composite indexes for primary list query paths
+  - [x] validate migration + integration search behavior
+- Done Criteria:
+  - search query behavior remains backward-compatible on API contracts
+  - benchmark and integration paths remain green
+  - architecture/performance docs updated
+- Risks:
+  - index bloat and write amplification due to additional GIN indexes
+  - locale/stemming expectations may differ under `simple` text search config
+
+### Ticket P1-4: Docs-Route Contract Auto Discovery
+
+- Priority: P1
+- Status: Completed
+- Tasks:
+  - [x] replace hardcoded route file list in `scripts/check_docs_routes.py` with app tree auto-discovery
+  - [x] keep existing API.md/README contract diff behavior
+  - [x] add script-focused regression tests
+- Done Criteria:
+  - new routers are checked without script-maintenance edits
+  - docs-contract CI gate remains green
+- Risks:
+  - future non-route decorators may require parser exclusion rules
+
+### Ticket P1-5: Production Compose Safety Baseline
+
+- Priority: P1
+- Status: Completed
+- Tasks:
+  - [x] add `docker-compose.prod.yml`
+  - [x] enable strict security defaults (auth/rate-limit/host/cors constraints) in prod compose
+  - [x] require secret env variables for runtime safety
+  - [x] document production compose usage in runbook/README
+- Done Criteria:
+  - prod compose starts with strict-mode compatible defaults
+  - required secrets missing case fails fast at compose level
+- Risks:
+  - operators must provide explicit host/origin/secret values before startup
+
 ### Ticket P2-1: Test Resilience Against SQL Rendering Changes
 
 - Priority: P2
