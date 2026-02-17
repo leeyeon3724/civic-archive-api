@@ -139,7 +139,7 @@ def check_readme_links(readme_text: str) -> List[str]:
 
 def main() -> int:
     route_files = [
-        PROJECT_ROOT / "app" / "__init__.py",
+        PROJECT_ROOT / "app" / "bootstrap" / "system_routes.py",
         PROJECT_ROOT / "app" / "observability.py",
         PROJECT_ROOT / "app" / "routes" / "news.py",
         PROJECT_ROOT / "app" / "routes" / "minutes.py",
