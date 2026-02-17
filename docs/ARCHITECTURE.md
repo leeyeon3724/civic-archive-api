@@ -24,8 +24,11 @@ app/
 ├── errors.py            # 표준 에러 payload/HTTPException 헬퍼
 ├── logging_config.py    # JSON 구조화 로깅 설정
 ├── observability.py     # request-id, 요청 로깅, Prometheus 메트릭
-├── security.py          # API key 검증 + rate limit 의존성
+├── security.py          # 보안 호환 facade (기존 import/patch 포인트 유지)
+├── security_dependencies.py # API key/JWT FastAPI dependency 빌더
 ├── security_jwt.py      # JWT claim 검증/인가 보조 로직
+├── security_proxy.py    # trusted proxy/XFF 기반 client key 해석
+├── security_rate_limit.py # rate limiter 구현/백엔드 헬스체크
 ├── parsing.py           # 날짜/시간 파싱 공통 정책
 ├── bootstrap/           # 앱 부트스트랩 경계(검증/미들웨어/시스템 라우트/예외 핸들러)
 │   ├── contracts.py
@@ -104,7 +107,7 @@ create_app()
   -> configure_logging()                # JSON 로그 포맷
   -> init_db(database_url + pool/timeout runtime tuning)
   -> app.state.db_engine / app.state.connection_provider 설정
-  -> API 보호 의존성(api-key/rate-limit) 구성
+  -> API 보호 의존성(api-key/jwt/rate-limit) 구성
   -> register_observability()           # X-Request-Id + metrics + request logging
   -> register_domain_routes(...)        # APIRouter 등록
   -> register_system_routes(...)        # /health, /api/echo 등 시스템 라우트 등록

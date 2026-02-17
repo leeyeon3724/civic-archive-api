@@ -392,11 +392,11 @@
 ### Ticket P1-2: Security Module Decomposition
 
 - Priority: P1
-- Status: In Progress
+- Status: Completed
 - Tasks:
-  - [ ] split `app/security.py` into jwt/rate-limit/proxy/dependency modules
+  - [x] split `app/security.py` into jwt/rate-limit/proxy/dependency modules
   - [x] keep public behavior and config surface backward compatible
-  - [ ] add module-level focused unit tests
+  - [x] add module-level focused unit tests
 - Done Criteria:
   - security responsibilities are separated into focused modules
   - existing security regression tests pass without behavior drift
