@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import argparse
 import json
 import os
 import statistics
@@ -22,6 +23,30 @@ from app.config import Config
 from app.repositories.minutes_repository import list_minutes, upsert_minutes
 from app.repositories.news_repository import list_articles, upsert_articles
 from app.repositories.segments_repository import insert_segments, list_segments
+
+SCENARIO_TAGS: dict[str, list[str]] = {
+    "news_list": ["domain:news", "endpoint:/api/news", "operation:list"],
+    "minutes_list": ["domain:minutes", "endpoint:/api/minutes", "operation:list"],
+    "segments_list": ["domain:segments", "endpoint:/api/segments", "operation:list"],
+}
+
+BENCHMARK_PROFILES: dict[str, dict[str, dict[str, float]]] = {
+    "dev": {
+        "news_list": {"avg_ms": 350.0, "p95_ms": 550.0},
+        "minutes_list": {"avg_ms": 350.0, "p95_ms": 550.0},
+        "segments_list": {"avg_ms": 450.0, "p95_ms": 700.0},
+    },
+    "staging": {
+        "news_list": {"avg_ms": 250.0, "p95_ms": 400.0},
+        "minutes_list": {"avg_ms": 250.0, "p95_ms": 400.0},
+        "segments_list": {"avg_ms": 250.0, "p95_ms": 400.0},
+    },
+    "prod": {
+        "news_list": {"avg_ms": 180.0, "p95_ms": 300.0},
+        "minutes_list": {"avg_ms": 200.0, "p95_ms": 320.0},
+        "segments_list": {"avg_ms": 220.0, "p95_ms": 350.0},
+    },
+}
 
 
 def percentile(values: list[float], p: float) -> float:
@@ -103,7 +128,7 @@ def _seed_data(rows: int = 300) -> None:
     insert_segments(segment_items)
 
 
-def _measure(name: str, fn, runs: int = 25) -> dict[str, float]:
+def _measure(name: str, fn, runs: int = 25) -> dict[str, float | list[str] | int]:
     durations = []
     for _ in range(runs):
         started = time.perf_counter()
@@ -111,6 +136,9 @@ def _measure(name: str, fn, runs: int = 25) -> dict[str, float]:
         durations.append((time.perf_counter() - started) * 1000.0)
 
     return {
+        "name": name,
+        "runs": int(runs),
+        "tags": list(SCENARIO_TAGS.get(name, [])),
         "avg_ms": round(statistics.fmean(durations), 2),
         "p95_ms": round(percentile(durations, 0.95), 2),
         "min_ms": round(min(durations), 2),
@@ -118,12 +146,88 @@ def _measure(name: str, fn, runs: int = 25) -> dict[str, float]:
     }
 
 
-def main() -> int:
-    config = Config()
-    database.init_db(config.DATABASE_URL)
-    _seed_data()
+def _parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Benchmark regression checks for primary list queries.")
+    parser.add_argument(
+        "--profile",
+        choices=["none", "dev", "staging", "prod"],
+        default=(os.getenv("BENCH_PROFILE", "none").strip().lower() or "none"),
+        help="Threshold profile to enforce.",
+    )
+    parser.add_argument(
+        "--runs",
+        type=int,
+        default=max(1, int(os.getenv("BENCH_RUNS", "25"))),
+        help="Per-scenario benchmark runs.",
+    )
+    parser.add_argument(
+        "--seed-rows",
+        type=int,
+        default=max(50, int(os.getenv("BENCH_SEED_ROWS", "300"))),
+        help="Rows to seed before running scenarios.",
+    )
+    return parser.parse_args()
 
-    results = {
+
+def get_profile_thresholds(profile: str) -> dict[str, dict[str, float]] | None:
+    normalized = (profile or "").strip().lower()
+    if normalized in {"", "none"}:
+        return None
+    return BENCHMARK_PROFILES.get(normalized)
+
+
+def evaluate_thresholds(
+    results: dict[str, dict[str, float | list[str] | int]],
+    *,
+    profile: str,
+    avg_threshold: float | None,
+    p95_threshold: float | None,
+) -> list[str]:
+    failures: list[str] = []
+    profile_thresholds = get_profile_thresholds(profile)
+
+    if profile_thresholds is not None:
+        for scenario_name, limits in profile_thresholds.items():
+            stats = results.get(scenario_name)
+            if stats is None:
+                failures.append(f"{scenario_name}: missing benchmark result for profile {profile}")
+                continue
+            avg_ms = float(stats["avg_ms"])
+            p95_ms = float(stats["p95_ms"])
+            limit_avg = float(limits["avg_ms"])
+            limit_p95 = float(limits["p95_ms"])
+            if avg_ms > limit_avg:
+                failures.append(
+                    f"{scenario_name}: avg_ms {avg_ms:.2f} exceeded profile[{profile}] limit {limit_avg:.2f}"
+                )
+            if p95_ms > limit_p95:
+                failures.append(
+                    f"{scenario_name}: p95_ms {p95_ms:.2f} exceeded profile[{profile}] limit {limit_p95:.2f}"
+                )
+    elif profile not in {"", "none"}:
+        failures.append(f"Unknown benchmark profile: {profile}")
+
+    if avg_threshold is not None:
+        for scenario_name, stats in results.items():
+            avg_ms = float(stats["avg_ms"])
+            if avg_ms > avg_threshold:
+                failures.append(
+                    f"{scenario_name}: avg_ms {avg_ms:.2f} exceeded global limit {avg_threshold:.2f}"
+                )
+
+    if p95_threshold is not None:
+        for scenario_name, stats in results.items():
+            p95_ms = float(stats["p95_ms"])
+            if p95_ms > p95_threshold:
+                failures.append(
+                    f"{scenario_name}: p95_ms {p95_ms:.2f} exceeded global limit {p95_threshold:.2f}"
+                )
+
+    return failures
+
+
+def _collect_results(runs: int) -> dict[str, dict[str, float | list[str] | int]]:
+    return {
         "news_list": _measure(
             "news_list",
             lambda: list_articles(
@@ -134,6 +238,7 @@ def main() -> int:
                 page=1,
                 size=20,
             ),
+            runs=runs,
         ),
         "minutes_list": _measure(
             "minutes_list",
@@ -148,6 +253,7 @@ def main() -> int:
                 page=1,
                 size=20,
             ),
+            runs=runs,
         ),
         "segments_list": _measure(
             "segments_list",
@@ -166,32 +272,47 @@ def main() -> int:
                 page=1,
                 size=20,
             ),
+            runs=runs,
         ),
     }
 
-    print(json.dumps(results, ensure_ascii=False, indent=2))
 
+def main() -> int:
+    args = _parse_args()
+
+    config = Config()
+    database.init_db(config.DATABASE_URL)
+    _seed_data(rows=max(50, int(args.seed_rows)))
+    results = _collect_results(runs=max(1, int(args.runs)))
+
+    avg_threshold = None
+    p95_threshold = None
     avg_threshold_raw = os.getenv("BENCH_FAIL_THRESHOLD_MS")
+    p95_threshold_raw = os.getenv("BENCH_FAIL_P95_THRESHOLD_MS")
     if avg_threshold_raw:
         avg_threshold = float(avg_threshold_raw)
-        avg_offenders = [name for name, stats in results.items() if stats["avg_ms"] > avg_threshold]
-        if avg_offenders:
-            print(
-                f"Benchmark regression check failed: avg_ms exceeded {avg_threshold} for {', '.join(avg_offenders)}",
-                file=sys.stderr,
-            )
-            return 1
-
-    p95_threshold_raw = os.getenv("BENCH_FAIL_P95_THRESHOLD_MS")
     if p95_threshold_raw:
         p95_threshold = float(p95_threshold_raw)
-        p95_offenders = [name for name, stats in results.items() if stats["p95_ms"] > p95_threshold]
-        if p95_offenders:
-            print(
-                f"Benchmark regression check failed: p95_ms exceeded {p95_threshold} for {', '.join(p95_offenders)}",
-                file=sys.stderr,
-            )
-            return 1
+
+    output = dict(results)
+    output["_meta"] = {
+        "profile": args.profile,
+        "profile_thresholds": get_profile_thresholds(args.profile),
+        "global_thresholds": {"avg_ms": avg_threshold, "p95_ms": p95_threshold},
+    }
+    print(json.dumps(output, ensure_ascii=False, indent=2))
+
+    failures = evaluate_thresholds(
+        results,
+        profile=args.profile,
+        avg_threshold=avg_threshold,
+        p95_threshold=p95_threshold,
+    )
+    if failures:
+        print("Benchmark regression check failed.", file=sys.stderr)
+        for failure in failures:
+            print(f" - {failure}", file=sys.stderr)
+        return 1
 
     return 0
 
