@@ -15,6 +15,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import text
 
 from app import create_app
+from app.services.segments_service import normalize_segment
 
 pytestmark = pytest.mark.integration
 
@@ -254,6 +255,70 @@ def test_segments_insert_and_filter(integration_client):
     assert listed.status_code == 200
     assert listed.json()["total"] == 1
     assert listed.json()["items"][0]["importance"] == 2
+
+
+def test_segments_insert_skips_existing_legacy_hash_row(integration_client):
+    payload = {
+        "council": "seoul",
+        "committee": "",
+        "session": "",
+        "meeting_no": None,
+        "meeting_date": "2026-02-17",
+        "content": "",
+        "summary": "",
+        "subject": "",
+        "party": "",
+        "constituency": "",
+        "department": "",
+    }
+    normalized = normalize_segment(payload)
+    legacy_hash = normalized["dedupe_hash_legacy"]
+    assert legacy_hash is not None
+
+    app = integration_client.app
+    with app.state.connection_provider() as conn:
+        conn.execute(
+            text(
+                """
+                INSERT INTO council_speech_segments
+                  (council, committee, "session", meeting_no, meeting_no_combined, meeting_date,
+                   content, summary, subject, tag, importance, moderator, questioner, answerer,
+                   party, constituency, department, dedupe_hash)
+                VALUES
+                  (:council, :committee, :session, :meeting_no, :meeting_no_combined, :meeting_date,
+                   :content, :summary, :subject, :tag, :importance, :moderator, :questioner, :answerer,
+                   :party, :constituency, :department, :dedupe_hash)
+                """
+            ),
+            {
+                "council": normalized["council"],
+                "committee": "",
+                "session": "",
+                "meeting_no": normalized["meeting_no"],
+                "meeting_no_combined": "",
+                "meeting_date": normalized["meeting_date"],
+                "content": "",
+                "summary": "",
+                "subject": "",
+                "tag": None,
+                "importance": normalized["importance"],
+                "moderator": None,
+                "questioner": None,
+                "answerer": None,
+                "party": "",
+                "constituency": "",
+                "department": "",
+                "dedupe_hash": legacy_hash,
+            },
+        )
+
+    duplicate = integration_client.post("/api/segments", json=payload)
+    assert duplicate.status_code == 201
+    assert duplicate.json() == {"inserted": 0}
+
+    listed = integration_client.get("/api/segments", params={"council": "seoul"})
+    assert listed.status_code == 200
+    assert listed.json()["total"] == 1
 
 
 def test_error_schema_contains_standard_fields(integration_client):

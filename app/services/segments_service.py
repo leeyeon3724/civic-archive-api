@@ -12,6 +12,18 @@ from app.repositories.segments_repository import SegmentsRepository
 from app.repositories.session_provider import ConnectionProvider, ensure_connection_provider
 from app.utils import bad_request, coerce_meeting_no_int, combine_meeting_no, parse_date
 
+LEGACY_EMPTY_STRING_FIELDS: tuple[str, ...] = (
+    "committee",
+    "session",
+    "meeting_no_combined",
+    "content",
+    "summary",
+    "subject",
+    "party",
+    "constituency",
+    "department",
+)
+
 
 def _optional_str(value: object) -> str | None:
     if value is None:
@@ -66,6 +78,14 @@ def _build_segment_dedupe_hash(item: Mapping[str, object]) -> str:
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
 
 
+def _build_legacy_segment_dedupe_hash(item: Mapping[str, object]) -> str:
+    legacy_payload: dict[str, object] = dict(item)
+    for field in LEGACY_EMPTY_STRING_FIELDS:
+        if legacy_payload.get(field) is None:
+            legacy_payload[field] = ""
+    return _build_segment_dedupe_hash(legacy_payload)
+
+
 def _normalize_segment(item: dict[str, object]) -> SegmentUpsertDTO:
     if not isinstance(item, dict):
         raise bad_request("Each item must be a JSON object.")
@@ -99,8 +119,10 @@ def _normalize_segment(item: dict[str, object]) -> SegmentUpsertDTO:
         "constituency": _optional_str(item.get("constituency")),
         "department": _optional_str(item.get("department")),
         "dedupe_hash": "",
+        "dedupe_hash_legacy": None,
     }
     normalized["dedupe_hash"] = _build_segment_dedupe_hash(normalized)
+    normalized["dedupe_hash_legacy"] = _build_legacy_segment_dedupe_hash(normalized)
     return normalized
 
 

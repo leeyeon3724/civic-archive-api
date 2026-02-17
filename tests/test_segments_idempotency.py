@@ -68,3 +68,5 @@ def test_normalize_segment_blank_and_none_optional_strings_share_dedupe_hash(seg
     none_normalized = segments_module.normalize_segment(none_payload)
 
     assert blank_normalized["dedupe_hash"] == none_normalized["dedupe_hash"]
+    assert blank_normalized["dedupe_hash_legacy"] == none_normalized["dedupe_hash_legacy"]
+    assert blank_normalized["dedupe_hash_legacy"] is not None

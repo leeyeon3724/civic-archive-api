@@ -68,6 +68,7 @@ def insert_segments(
             "constituency": segment.get("constituency"),
             "department": segment.get("department"),
             "dedupe_hash": segment.get("dedupe_hash"),
+            "dedupe_hash_legacy": segment.get("dedupe_hash_legacy"),
         }
         for segment in items
     ]
@@ -95,7 +96,8 @@ def insert_segments(
                 party text,
                 constituency text,
                 department text,
-                dedupe_hash text
+                dedupe_hash text,
+                dedupe_hash_legacy text
               )
         ),
         inserted_rows AS (
@@ -122,7 +124,16 @@ def insert_segments(
               constituency,
               department,
               dedupe_hash
-            FROM payload
+            FROM payload p
+            WHERE NOT EXISTS (
+              SELECT 1
+              FROM council_speech_segments s
+              WHERE s.dedupe_hash = p.dedupe_hash
+                 OR (
+                   p.dedupe_hash_legacy IS NOT NULL
+                   AND s.dedupe_hash = p.dedupe_hash_legacy
+                 )
+            )
             ON CONFLICT (dedupe_hash) DO NOTHING
             RETURNING 1
         )

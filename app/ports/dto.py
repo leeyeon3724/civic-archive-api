@@ -78,6 +78,7 @@ class SegmentUpsertDTO(TypedDict):
     constituency: str | None
     department: str | None
     dedupe_hash: str
+    dedupe_hash_legacy: str | None
 
 
 class SegmentRecordDTO(TypedDict, total=False):

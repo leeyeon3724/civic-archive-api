@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import time
 from urllib.parse import urlparse
 
 import requests
@@ -28,14 +29,54 @@ def _http_get_json(url: str, timeout: float) -> tuple[int, dict | str]:
         return 0, f"connection error: {exc}"
 
 
+def _check_with_retry(
+    *,
+    name: str,
+    url: str,
+    expected: int,
+    timeout: float,
+    retries: int,
+    retry_delay_seconds: float,
+) -> bool:
+    attempts = max(1, retries + 1)
+    for attempt in range(1, attempts + 1):
+        status, body = _http_get_json(url, timeout)
+        if status == expected:
+            print(f"[OK] {name}: {status} ({url}) [attempt {attempt}/{attempts}]")
+            return True
+
+        if attempt < attempts:
+            time.sleep(max(0.0, retry_delay_seconds))
+            continue
+
+        print(f"[FAIL] {name}: expected {expected}, got {status} ({url}) [attempt {attempt}/{attempts}]")
+        print(f"       body={body}")
+        return False
+    return False
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Runtime health checks for deployment guardrails")
     parser.add_argument("--base-url", default="http://localhost:8000", help="Target base URL")
     parser.add_argument("--timeout-seconds", type=float, default=3.0, help="HTTP timeout seconds")
+    parser.add_argument(
+        "--retries",
+        type=int,
+        default=3,
+        help="Retry count per check (total attempts = retries + 1)",
+    )
+    parser.add_argument(
+        "--retry-delay-seconds",
+        type=float,
+        default=1.0,
+        help="Delay between retries in seconds",
+    )
     args = parser.parse_args()
 
     base = args.base_url.rstrip("/")
     timeout = max(0.5, float(args.timeout_seconds))
+    retries = max(0, int(args.retries))
+    retry_delay_seconds = max(0.0, float(args.retry_delay_seconds))
 
     checks = [
         ("live", f"{base}/health/live", 200),
@@ -44,13 +85,15 @@ def main() -> int:
 
     failed = False
     for name, url, expected in checks:
-        status, body = _http_get_json(url, timeout)
-        if status != expected:
-            failed = True
-            print(f"[FAIL] {name}: expected {expected}, got {status} ({url})")
-            print(f"       body={body}")
-        else:
-            print(f"[OK] {name}: {status} ({url})")
+        ok = _check_with_retry(
+            name=name,
+            url=url,
+            expected=expected,
+            timeout=timeout,
+            retries=retries,
+            retry_delay_seconds=retry_delay_seconds,
+        )
+        failed = failed or (not ok)
 
     return 1 if failed else 0
 
