@@ -1,0 +1,113 @@
+﻿import logging
+
+from fastapi import Body, Depends, FastAPI, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import PlainTextResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.middleware.trustedhost import TrustedHostMiddleware
+
+from app.config import Config
+from app.database import init_db
+from app.errors import error_response, normalize_http_exception
+from app.logging_config import configure_logging
+from app.observability import register_observability
+from app.routes import register_routes
+from app.schemas import EchoResponse, ErrorResponse, HealthResponse
+from app.security import build_api_key_dependency, build_rate_limit_dependency
+
+OPENAPI_TAGS = [
+    {"name": "system", "description": "System and health endpoints"},
+    {"name": "news", "description": "News ingestion and search"},
+    {"name": "minutes", "description": "Council minutes ingestion and search"},
+    {"name": "segments", "description": "Speech segment ingestion and search"},
+]
+
+logger = logging.getLogger("civic_archive.api")
+
+
+def create_app(config=None):
+    if config is None:
+        config = Config()
+
+    configure_logging(level=config.LOG_LEVEL, json_logs=config.LOG_JSON)
+
+    api = FastAPI(
+        title="Civic Archive API",
+        version="1.1.0",
+        description="Local council archive API with FastAPI + PostgreSQL",
+        openapi_tags=OPENAPI_TAGS,
+    )
+
+    if config.BOOTSTRAP_TABLES_ON_STARTUP:
+        raise RuntimeError("BOOTSTRAP_TABLES_ON_STARTUP is disabled. Run 'alembic upgrade head' before startup.")
+    if config.REQUIRE_API_KEY and not (config.API_KEY or "").strip():
+        raise RuntimeError("REQUIRE_API_KEY=1 requires API_KEY to be set.")
+
+    api.add_middleware(
+        CORSMiddleware,
+        allow_origins=config.cors_allow_origins_list,
+        allow_methods=config.cors_allow_methods_list,
+        allow_headers=config.cors_allow_headers_list,
+    )
+    api.add_middleware(TrustedHostMiddleware, allowed_hosts=config.allowed_hosts_list)
+
+    init_db(config.DATABASE_URL)
+    register_observability(api)
+
+    api_key_dependency = build_api_key_dependency(config)
+    rate_limit_dependency = build_rate_limit_dependency(config)
+    protected_dependencies = [Depends(api_key_dependency), Depends(rate_limit_dependency)]
+    register_routes(api, dependencies=protected_dependencies)
+
+    @api.get("/", tags=["system"])
+    async def hello_world():
+        return PlainTextResponse("API Server Available")
+
+    @api.get("/health", tags=["system"], response_model=HealthResponse, responses={500: {"model": ErrorResponse}})
+    async def health():
+        return HealthResponse(status="ok")
+
+    @api.post(
+        "/api/echo",
+        tags=["system"],
+        summary="Echo request payload",
+        dependencies=protected_dependencies,
+        response_model=EchoResponse,
+        responses={400: {"model": ErrorResponse}, 401: {"model": ErrorResponse}, 429: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
+    )
+    async def echo(request: Request, _payload: dict = Body(default_factory=dict)):
+        try:
+            data = await request.json()
+        except Exception:
+            data = {}
+        if data is None:
+            data = {}
+        return EchoResponse(you_sent=data)
+
+    @api.exception_handler(StarletteHTTPException)
+    async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+        return normalize_http_exception(request, exc)
+
+    @api.exception_handler(RequestValidationError)
+    async def validation_exception_handler(request: Request, exc: RequestValidationError):
+        message = "; ".join(err.get("msg", "invalid request") for err in exc.errors())
+        return error_response(
+            request,
+            status_code=400,
+            code="VALIDATION_ERROR",
+            message=message or "invalid request",
+            details=exc.errors(),
+        )
+
+    @api.exception_handler(Exception)
+    async def server_error_handler(request: Request, exc: Exception):
+        logger.exception("unhandled_exception", extra={"request_id": getattr(request.state, "request_id", None)})
+        return error_response(
+            request,
+            status_code=500,
+            code="INTERNAL_ERROR",
+            message="Internal Server Error",
+        )
+
+    return api

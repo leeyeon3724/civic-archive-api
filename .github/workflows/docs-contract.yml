@@ -1,0 +1,70 @@
+﻿name: Docs Contract
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: postgres:16
+        env:
+          POSTGRES_USER: app_user
+          POSTGRES_PASSWORD: change_me
+          POSTGRES_DB: civic_archive
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U app_user -d civic_archive"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      POSTGRES_HOST: 127.0.0.1
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: app_user
+      POSTGRES_PASSWORD: change_me
+      POSTGRES_DB: civic_archive
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Run unit/contract tests
+        run: python -m pytest -q -m "not e2e and not integration"
+
+      - name: Enforce schema policy (no manual DDL)
+        run: python scripts/check_schema_policy.py
+
+      - name: Apply Alembic migrations (online, required)
+        run: python -m alembic upgrade head
+
+      - name: Run integration tests (PostgreSQL)
+        env:
+          RUN_INTEGRATION: "1"
+        run: python -m pytest -q -m integration
+
+      - name: Run benchmark regression checks
+        env:
+          RUN_INTEGRATION: "1"
+          BENCH_FAIL_THRESHOLD_MS: "250"
+          BENCH_FAIL_P95_THRESHOLD_MS: "400"
+        run: python scripts/benchmark_queries.py
+
+      - name: Validate Alembic revisions (offline SQL)
+        run: python -m alembic upgrade head --sql > /tmp/alembic.sql
+
+      - name: Check route-doc sync
+        run: python scripts/check_docs_routes.py
