@@ -9,8 +9,8 @@ def test_news_upsert_batch_dedupes_same_url_with_last_item_wins(news_module, mak
     def handler(statement, params):
         sql = str(statement).lower()
         if "insert into news_articles" in sql:
-            payload = json.loads(params["items"])
-            captured_items["payload"] = payload
+            parsed_items = json.loads(params["items"])
+            captured_items["payload"] = parsed_items
             return StubResult(rows=[{"inserted": 1, "updated": 0}])
         return StubResult()
 
@@ -25,10 +25,10 @@ def test_news_upsert_batch_dedupes_same_url_with_last_item_wins(news_module, mak
 
     assert inserted == 1
     assert updated == 0
-    payload = captured_items["payload"]
-    assert len(payload) == 1
-    assert payload[0]["url"] == "https://example.com/n/1"
-    assert payload[0]["title"] == "second"
+    deduped_items = captured_items["payload"]
+    assert len(deduped_items) == 1
+    assert deduped_items[0]["url"] == "https://example.com/n/1"
+    assert deduped_items[0]["title"] == "second"
 
 
 def test_minutes_upsert_batch_dedupes_same_url_with_last_item_wins(minutes_module, make_connection_provider):
@@ -37,8 +37,8 @@ def test_minutes_upsert_batch_dedupes_same_url_with_last_item_wins(minutes_modul
     def handler(statement, params):
         sql = str(statement).lower()
         if "insert into council_minutes" in sql:
-            payload = json.loads(params["items"])
-            captured_items["payload"] = payload
+            parsed_items = json.loads(params["items"])
+            captured_items["payload"] = parsed_items
             return StubResult(rows=[{"inserted": 1, "updated": 0}])
         return StubResult()
 
@@ -53,7 +53,7 @@ def test_minutes_upsert_batch_dedupes_same_url_with_last_item_wins(minutes_modul
 
     assert inserted == 1
     assert updated == 0
-    payload = captured_items["payload"]
-    assert len(payload) == 1
-    assert payload[0]["url"] == "https://example.com/m/1"
-    assert payload[0]["committee"] == "plenary"
+    deduped_items = captured_items["payload"]
+    assert len(deduped_items) == 1
+    assert deduped_items[0]["url"] == "https://example.com/m/1"
+    assert deduped_items[0]["committee"] == "plenary"

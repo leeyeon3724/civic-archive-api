@@ -73,11 +73,6 @@ class Config(BaseSettings):
             database=self.POSTGRES_DB,
         ).render_as_string(hide_password=False)
 
-    def _database_url_compat(self) -> str:
-        return self.database_url
-
-    DATABASE_URL = property(_database_url_compat)
-
     @staticmethod
     def _parse_csv(value: str) -> List[str]:
         return [item.strip() for item in value.split(",") if item.strip()]

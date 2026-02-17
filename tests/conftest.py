@@ -37,7 +37,7 @@ def build_test_config(**overrides: Any) -> Config:
         "SECURITY_STRICT_MODE": False,
     }
     defaults.update(overrides)
-    return Config(_env_file=None, **defaults)
+    return Config.model_validate(defaults)
 
 
 class StubResult:

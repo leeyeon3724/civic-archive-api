@@ -346,7 +346,7 @@ def main() -> int:
     if p95_threshold_raw:
         p95_threshold = float(p95_threshold_raw)
 
-    output = dict(results)
+    output: dict[str, Any] = dict(results)
     output["_meta"] = {
         "profile": args.profile,
         "profile_thresholds": get_profile_thresholds(args.profile),

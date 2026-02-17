@@ -812,10 +812,14 @@ def test_rate_limit_redis_backend_is_usable_with_custom_limiter(make_engine):
 def test_create_app_applies_database_runtime_tuning():
     captured = {}
 
-    def fake_create_engine(url, **kwargs):
+    def fake_create_engine(url, **create_engine_kwargs):
         captured["url"] = url
-        captured["kwargs"] = kwargs
-        return StubEngine(lambda *_: StubResult())
+        captured["kwargs"] = create_engine_kwargs
+
+        def _default_handler(_statement, _params=None):
+            return StubResult()
+
+        return StubEngine(_default_handler)
 
     with patch("app.database.create_engine", side_effect=fake_create_engine):
         app = create_app(
@@ -830,14 +834,14 @@ def test_create_app_applies_database_runtime_tuning():
         )
 
     assert app is not None
-    kwargs = captured["kwargs"]
-    assert kwargs["pool_size"] == 7
-    assert kwargs["max_overflow"] == 13
-    assert kwargs["pool_timeout"] == 11
-    assert kwargs["pool_recycle"] == 1800
-    assert kwargs["connect_args"]["connect_timeout"] == 4
-    assert "statement_timeout=4500" in kwargs["connect_args"]["options"]
-    assert "application_name=civic_archive_api" in kwargs["connect_args"]["options"]
+    init_kwargs = captured["kwargs"]
+    assert init_kwargs["pool_size"] == 7
+    assert init_kwargs["max_overflow"] == 13
+    assert init_kwargs["pool_timeout"] == 11
+    assert init_kwargs["pool_recycle"] == 1800
+    assert init_kwargs["connect_args"]["connect_timeout"] == 4
+    assert "statement_timeout=4500" in init_kwargs["connect_args"]["options"]
+    assert "application_name=civic_archive_api" in init_kwargs["connect_args"]["options"]
 
 
 @pytest.mark.parametrize(

@@ -43,8 +43,8 @@ def test_middleware_module_enforces_request_size_guard():
         return {"status": "ok"}
 
     @api.post("/api/echo")
-    async def echo(payload: dict):
-        return payload
+    async def echo(request_body: dict):
+        return request_body
 
     with TestClient(api) as client:
         health = client.get("/status")
@@ -57,9 +57,9 @@ def test_middleware_module_enforces_request_size_guard():
             headers={"Content-Type": "application/json"},
         )
         assert oversized.status_code == 413
-        payload = oversized.json()
-        assert payload["code"] == "PAYLOAD_TOO_LARGE"
-        assert payload["details"]["max_request_body_bytes"] == 64
+        error_body = oversized.json()
+        assert error_body["code"] == "PAYLOAD_TOO_LARGE"
+        assert error_body["details"]["max_request_body_bytes"] == 64
 
 
 def test_system_routes_module_readiness_and_echo():
@@ -74,10 +74,10 @@ def test_system_routes_module_readiness_and_echo():
     with TestClient(api) as client:
         ready = client.get("/health/ready")
         assert ready.status_code == 503
-        payload = ready.json()
-        assert payload["status"] == "degraded"
-        assert payload["checks"]["database"]["ok"] is True
-        assert payload["checks"]["rate_limit_backend"]["ok"] is False
+        readiness_body = ready.json()
+        assert readiness_body["status"] == "degraded"
+        assert readiness_body["checks"]["database"]["ok"] is True
+        assert readiness_body["checks"]["rate_limit_backend"]["ok"] is False
 
         echo = client.post("/api/echo", json={"hello": "world"})
         assert echo.status_code == 200
