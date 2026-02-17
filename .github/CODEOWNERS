@@ -1,0 +1,7 @@
+# Adjust owners if your GitHub username/team differs.
+
+* @leeyeon3724
+/app/ @leeyeon3724
+/migrations/ @leeyeon3724
+/docs/ @leeyeon3724
+/.github/workflows/ @leeyeon3724
