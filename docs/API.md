@@ -31,6 +31,7 @@
 - 검증 실패는 `400 (VALIDATION_ERROR)`로 응답
 - 인증이 활성화된 경우(`REQUIRE_API_KEY=1`) `/api/*` 요청에 `X-API-Key` 헤더 필수
 - 요청 제한이 활성화된 경우(`RATE_LIMIT_PER_MINUTE>0`) IP 기준 `429 (RATE_LIMITED)` 응답 가능
+  - 백엔드: `RATE_LIMIT_BACKEND=memory|redis` (`redis` 사용 시 `REDIS_URL` 필요)
 
 ## 유틸리티 엔드포인트
 

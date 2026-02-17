@@ -46,6 +46,10 @@ Copy-Item .env.example .env
 | `REQUIRE_API_KEY` | `0` | `1`이면 `/api/*` 엔드포인트에 `X-API-Key` 필수 |
 | `API_KEY` | `` | API 키 값 (`REQUIRE_API_KEY=1`일 때 필수) |
 | `RATE_LIMIT_PER_MINUTE` | `0` | IP 기준 분당 요청 제한 (`0`이면 비활성) |
+| `RATE_LIMIT_BACKEND` | `memory` | rate limit 저장소 (`memory` 또는 `redis`) |
+| `REDIS_URL` | `` | Redis 연결 URL (`RATE_LIMIT_BACKEND=redis`일 때 필수) |
+| `RATE_LIMIT_REDIS_PREFIX` | `civic_archive:rate_limit` | Redis rate limit 키 prefix |
+| `RATE_LIMIT_REDIS_WINDOW_SECONDS` | `65` | Redis 고정 윈도우 TTL(초) |
 | `CORS_ALLOW_ORIGINS` | `*` | 허용 Origin 목록(쉼표 구분) |
 | `CORS_ALLOW_METHODS` | `GET,POST,DELETE,OPTIONS` | 허용 HTTP 메서드(쉼표 구분) |
 | `CORS_ALLOW_HEADERS` | `*` | 허용 헤더(쉼표 구분) |
@@ -62,6 +66,7 @@ Copy-Item .env.example .env
 - 기본값(`REQUIRE_API_KEY=0`)은 로컬 개발 편의를 위한 설정입니다.
 - 운영 환경에서는 `REQUIRE_API_KEY=1`, `API_KEY=<secret>` 적용을 권장합니다.
 - `RATE_LIMIT_PER_MINUTE`로 `/api/*` 엔드포인트 요청 제한을 활성화할 수 있습니다.
+- 다중 인스턴스 환경에서는 `RATE_LIMIT_BACKEND=redis`, `REDIS_URL=redis://...` 구성을 권장합니다.
 
 ## 마이그레이션
 
@@ -92,6 +97,9 @@ python scripts/check_docs_routes.py
 
 # 스키마 정책 검사 (런타임 수동 DDL 금지)
 python scripts/check_schema_policy.py
+
+# 버전 정책 검사 (단일 소스 + 변경 이력 정합성)
+python scripts/check_version_consistency.py
 ```
 
 릴리스 태그(`vX.Y.Z`) 푸시 시 `/.github/workflows/release-tag.yml`에서

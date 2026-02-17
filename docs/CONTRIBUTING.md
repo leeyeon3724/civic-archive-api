@@ -44,6 +44,7 @@ PR 본문에 아래 항목을 포함합니다.
 - `python -m pytest -q -m "not e2e and not integration"`
 - `python scripts/check_docs_routes.py`
 - `python scripts/check_schema_policy.py`
+- `python scripts/check_version_consistency.py`
 
 추가 검증 규칙:
 

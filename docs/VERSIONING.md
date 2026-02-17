@@ -26,6 +26,13 @@
 - Git 태그는 `v` 접두사를 사용합니다.
 - 예: `v0.1.0`, `v0.2.1`
 
+## 버전 단일 소스
+
+- 애플리케이션 버전 문자열의 단일 소스는 `app/version.py`의 `APP_VERSION`입니다.
+- FastAPI OpenAPI 버전은 `APP_VERSION`을 그대로 사용해야 합니다.
+- `docs/CHANGELOG.md`에는 `APP_VERSION`과 동일한 버전 섹션이 존재해야 합니다.
+- 자동 검증: `python scripts/check_version_consistency.py`
+
 ## 릴리스 체크리스트
 
 1. 사전 검증

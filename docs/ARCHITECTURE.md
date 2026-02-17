@@ -8,6 +8,7 @@
 - pydantic-settings
 - Alembic
 - prometheus-client
+- Redis (선택: 분산 rate limit)
 - Docker / docker-compose
 - pytest
 
@@ -17,6 +18,7 @@
 app/
 ├── __init__.py          # create_app() + 공통 예외 처리
 ├── main.py              # ASGI 엔트리포인트(app 인스턴스 export)
+├── version.py           # 앱 버전 단일 소스(APP_VERSION)
 ├── config.py            # 환경변수 -> DATABASE_URL
 ├── database.py          # init_db() 전용 (런타임 DDL 없음)
 ├── errors.py            # 표준 에러 payload/HTTPException 헬퍼
@@ -47,7 +49,8 @@ scripts/
 ├── bootstrap_db.py      # alembic upgrade head 실행
 ├── benchmark_queries.py # 대표 조회 쿼리 성능 회귀 체크
 ├── check_docs_routes.py # API.md 라우트 계약 + README 링크 검사
-└── check_schema_policy.py # 런타임 수동 DDL 금지 정책 검사
+├── check_schema_policy.py # 런타임 수동 DDL 금지 정책 검사
+└── check_version_consistency.py # APP_VERSION <-> app/__init__.py <-> CHANGELOG 정합성 검사
 Dockerfile
 docker-compose.yml
 tests/
@@ -102,7 +105,9 @@ ASGI 엔트리포인트: `app.main:app`
 - 목록 total: `COUNT(*)` 별도 쿼리
 - 요청/응답 검증: FastAPI + Pydantic 모델 기반으로 OpenAPI 자동 문서화
 - 에러 표준화: `code/message/error/request_id/details` 단일 포맷
-- 관측성: request-id 미들웨어, 구조화 로그, `/metrics` 메트릭
+- 관측성: request-id 미들웨어, 구조화 로그, `/metrics` 메트릭 (라우트 미매칭은 `/_unmatched`로 라벨 고정)
 - 보안 기본선: API key 선택적 강제(`REQUIRE_API_KEY`), IP rate-limit(`RATE_LIMIT_PER_MINUTE`)
+- 분산 rate-limit: `RATE_LIMIT_BACKEND=redis`, `REDIS_URL`로 멀티 인스턴스 환경 지원
 - 성능 회귀 체크: `scripts/benchmark_queries.py` + avg/p95 threshold 검사
 - 문서-코드 정합성: `scripts/check_docs_routes.py` + CI
+- 버전 정합성: `scripts/check_version_consistency.py` + CI
