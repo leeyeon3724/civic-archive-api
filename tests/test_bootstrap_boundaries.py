@@ -66,7 +66,6 @@ def test_system_routes_module_readiness_and_echo():
     api = FastAPI()
     register_system_routes(
         api,
-        config=build_test_config(),
         protected_dependencies=[],
         db_health_check=lambda: (True, None),
         rate_limit_health_check=lambda: (False, "redis down"),

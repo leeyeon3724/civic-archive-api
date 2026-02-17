@@ -27,7 +27,7 @@ def register_exception_handlers(api: FastAPI, *, logger: logging.Logger) -> None
         )
 
     @api.exception_handler(Exception)
-    async def server_error_handler(request: Request, exc: Exception) -> JSONResponse:
+    async def server_error_handler(request: Request, _exc: Exception) -> JSONResponse:
         logger.exception("unhandled_exception", extra={"request_id": getattr(request.state, "request_id", None)})
         return error_response(
             request,

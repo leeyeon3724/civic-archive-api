@@ -164,7 +164,7 @@ def test_save_news_accepts_object_and_list(client, override_dependency):
 
         @staticmethod
         def upsert_articles(items):
-            return (len(items), 0)
+            return len(items), 0
 
     override_dependency(get_news_service, lambda: FakeNewsService())
 

@@ -1,17 +1,17 @@
 from __future__ import annotations
 
+import json
+
 from fastapi import Body, FastAPI, Request
 from fastapi.responses import JSONResponse, PlainTextResponse
 
 from app.bootstrap.contracts import DBHealthCheck, ProtectedDependencies, RateLimitHealthCheck
-from app.config import Config
 from app.schemas import EchoResponse, ErrorResponse, HealthResponse, ReadinessCheck, ReadinessResponse
 
 
 def register_system_routes(
     api: FastAPI,
     *,
-    config: Config,
     protected_dependencies: ProtectedDependencies,
     db_health_check: DBHealthCheck,
     rate_limit_health_check: RateLimitHealthCheck,
@@ -67,7 +67,7 @@ def register_system_routes(
     async def echo(request: Request, _payload: dict = Body(default_factory=dict)) -> EchoResponse:
         try:
             data = await request.json()
-        except Exception:
+        except (json.JSONDecodeError, UnicodeDecodeError):
             data = {}
         if data is None:
             data = {}

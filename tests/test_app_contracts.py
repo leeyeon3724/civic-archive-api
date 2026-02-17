@@ -76,7 +76,7 @@ def test_save_minutes_accepts_object_and_list(client, override_dependency):
 
         @staticmethod
         def upsert_minutes(items):
-            return (len(items), 0)
+            return len(items), 0
 
     override_dependency(get_minutes_service, lambda: FakeMinutesService())
 

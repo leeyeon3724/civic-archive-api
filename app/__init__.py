@@ -84,7 +84,6 @@ def create_app(config: Config | None = None) -> FastAPI:
     register_domain_routes(api, protected_dependencies=protected_dependencies)
     register_system_routes(
         api,
-        config=config,
         protected_dependencies=protected_dependencies,
         db_health_check=db_health_check,
         rate_limit_health_check=lambda: check_rate_limit_backend_health(config),
