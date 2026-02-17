@@ -350,15 +350,15 @@
 ### Ticket P1-1: Type Gate Expansion to Bootstrap/Routes
 
 - Priority: P1
-- Status: Planned
+- Status: Completed
 - Tasks:
-  - remove `mypy.ini` ignore blocks for `app.__init__`, `app.bootstrap.*`, `app.routes.*` in phases
-  - annotate `app.state` access and dependency contracts to reduce `Any` leakage
-  - add/adjust typing tests for startup and route wiring paths
+  - [x] remove `mypy.ini` ignore blocks for `app.__init__`, `app.bootstrap.*`, `app.routes.*` in phases
+  - [x] annotate `app.state` access and dependency contracts to reduce `Any` leakage
+  - [x] add/adjust typing tests for startup and route wiring paths
 - Done Criteria:
-  - mypy blocking scope includes app bootstrap and route modules
-  - no `ignore_errors = True` remains for bootstrap/routes
-  - CI docs-contract workflow remains green
+  - [x] mypy blocking scope includes app bootstrap and route modules
+  - [x] no `ignore_errors = True` remains for bootstrap/routes
+  - [x] CI docs-contract workflow remains green
 - Risks:
   - short-term PR velocity drop while annotations are introduced
   - additional refactor may be needed in FastAPI dependency signatures
@@ -366,11 +366,11 @@
 ### Ticket P1-2: Security Module Decomposition
 
 - Priority: P1
-- Status: Planned
+- Status: In Progress
 - Tasks:
-  - split `app/security.py` into jwt/rate-limit/proxy/dependency modules
-  - keep public behavior and config surface backward compatible
-  - add module-level focused unit tests
+  - [ ] split `app/security.py` into jwt/rate-limit/proxy/dependency modules
+  - [x] keep public behavior and config surface backward compatible
+  - [ ] add module-level focused unit tests
 - Done Criteria:
   - security responsibilities are separated into focused modules
   - existing security regression tests pass without behavior drift
@@ -382,10 +382,10 @@
 ### Ticket P2-1: Test Resilience Against SQL Rendering Changes
 
 - Priority: P2
-- Status: Planned
+- Status: In Progress
 - Tasks:
-  - reduce SQL string rendering assertions in tests
-  - shift to behavior-focused assertions (params, row mapping, pagination offsets, call counts)
+  - [x] reduce SQL string rendering assertions in tests
+  - [x] shift to behavior-focused assertions (params, row mapping, pagination offsets, call counts)
   - keep minimal SQL shape assertions only where contractually necessary
 - Done Criteria:
   - repository/service tests do not depend on exact SQL text rendering
@@ -396,11 +396,11 @@
 ### Ticket P2-2: Parsing/Domain Contract Unification
 
 - Priority: P2
-- Status: Planned
+- Status: In Progress
 - Tasks:
-  - unify duplicated date/datetime parsing policy across `schemas` and `utils`
+  - [x] unify duplicated date/datetime parsing policy across `schemas` and `utils`
   - introduce typed DTO boundaries for service/repository ports incrementally
-  - align error messages and validation semantics across layers
+  - [x] align error messages and validation semantics across layers
 - Done Criteria:
   - single parsing policy implementation is reused across layers
   - `dict[str, Any]` boundary usage is reduced in ports/services

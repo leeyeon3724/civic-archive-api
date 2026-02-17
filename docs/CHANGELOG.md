@@ -83,6 +83,10 @@
 - 공급망 보안 워크플로우 Bandit 실행에서 `B608` 임시 제외를 제거하고 전체 규칙을 활성화
 - 테스트 부트스트랩에 test config factory를 도입해 `.env` 영향 없이 결정적으로 앱 설정을 주입하도록 정리
 - 리팩토링 로드맵 실행 티켓(P0/P1/P2)을 `docs/REFACTOR_BACKLOG.md`에 우선순위/완료조건/리스크 형식으로 추가
+- mypy blocking 범위를 `app.__init__/bootstrap/routes`까지 확장하고 관련 타입 불일치를 보강
+- JWT 검증/인가 로직을 `app/security_jwt.py` 모듈로 분리해 `security.py` 책임을 단계적으로 축소
+- 날짜/시간 파싱 로직을 `app/parsing.py`로 통합해 `schemas`/`utils` 중복 구현을 제거
+- 테스트 더블(`StubConnection`)에 statement object 기록을 추가하고 일부 SQL 문자열 결합 검증을 파라미터 기반으로 전환
 
 ### 수정됨
 
