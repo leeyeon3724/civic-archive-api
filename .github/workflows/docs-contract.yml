@@ -51,6 +51,9 @@ jobs:
       - name: Enforce version consistency (single source + changelog)
         run: python scripts/check_version_consistency.py
 
+      - name: Enforce SLO policy baseline
+        run: python scripts/check_slo_policy.py
+
       - name: Apply Alembic migrations (online, required)
         run: python -m alembic upgrade head
 
