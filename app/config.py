@@ -20,6 +20,8 @@ class Config(BaseSettings):
     POSTGRES_DB: str = "civic_archive"
 
     DEBUG: bool = False
+    APP_ENV: str = "development"
+    SECURITY_STRICT_MODE: bool = False
     PORT: int = 8000
     BOOTSTRAP_TABLES_ON_STARTUP: bool = False
 
@@ -89,3 +91,14 @@ class Config(BaseSettings):
     def rate_limit_backend(self) -> str:
         value = (self.RATE_LIMIT_BACKEND or "").strip().lower()
         return value or "memory"
+
+    @property
+    def app_env(self) -> str:
+        value = (self.APP_ENV or "").strip().lower()
+        return value or "development"
+
+    @property
+    def strict_security_mode(self) -> bool:
+        if bool(self.SECURITY_STRICT_MODE):
+            return True
+        return self.app_env in {"prod", "production"}

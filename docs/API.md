@@ -37,6 +37,7 @@
   - `JWT_AUDIENCE`/`JWT_ISSUER` 설정 시 `aud`/`iss` 클레임 검증
   - 메서드별 scope 정책: `JWT_SCOPE_READ`, `JWT_SCOPE_WRITE`, `JWT_SCOPE_DELETE`
   - `JWT_ADMIN_ROLE` role 보유 시 scope 검사 우회
+- 운영 strict 모드(`SECURITY_STRICT_MODE=1` 또는 `APP_ENV=production`)에서는 인증/호스트/CORS/rate-limit 가드가 강제됨
 - 요청 제한이 활성화된 경우(`RATE_LIMIT_PER_MINUTE>0`) IP 기준 `429 (RATE_LIMITED)` 응답 가능
   - 백엔드: `RATE_LIMIT_BACKEND=memory|redis` (`redis` 사용 시 `REDIS_URL` 필요)
   - Redis 장애 시 fallback 정책: `RATE_LIMIT_FAIL_OPEN` (`1`=허용, `0`=차단)

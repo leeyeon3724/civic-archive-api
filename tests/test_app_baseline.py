@@ -453,6 +453,89 @@ def test_jwt_algorithm_must_be_hs256(make_engine):
             )
 
 
+def test_strict_security_mode_requires_authentication(make_engine):
+    with patch("app.database.create_engine", return_value=make_engine(lambda *_: StubResult())):
+        with pytest.raises(RuntimeError):
+            create_app(
+                Config(
+                    SECURITY_STRICT_MODE=True,
+                    ALLOWED_HOSTS="api.example.com",
+                    CORS_ALLOW_ORIGINS="https://app.example.com",
+                    RATE_LIMIT_PER_MINUTE=60,
+                )
+            )
+
+
+def test_strict_security_mode_rejects_wildcard_allowed_hosts(make_engine):
+    with patch("app.database.create_engine", return_value=make_engine(lambda *_: StubResult())):
+        with pytest.raises(RuntimeError):
+            create_app(
+                Config(
+                    SECURITY_STRICT_MODE=True,
+                    REQUIRE_API_KEY=True,
+                    API_KEY="strict-key",
+                    ALLOWED_HOSTS="*",
+                    CORS_ALLOW_ORIGINS="https://app.example.com",
+                    RATE_LIMIT_PER_MINUTE=60,
+                )
+            )
+
+
+def test_strict_security_mode_rejects_wildcard_cors(make_engine):
+    with patch("app.database.create_engine", return_value=make_engine(lambda *_: StubResult())):
+        with pytest.raises(RuntimeError):
+            create_app(
+                Config(
+                    SECURITY_STRICT_MODE=True,
+                    REQUIRE_API_KEY=True,
+                    API_KEY="strict-key",
+                    ALLOWED_HOSTS="api.example.com",
+                    CORS_ALLOW_ORIGINS="*",
+                    RATE_LIMIT_PER_MINUTE=60,
+                )
+            )
+
+
+def test_strict_security_mode_requires_positive_rate_limit(make_engine):
+    with patch("app.database.create_engine", return_value=make_engine(lambda *_: StubResult())):
+        with pytest.raises(RuntimeError):
+            create_app(
+                Config(
+                    SECURITY_STRICT_MODE=True,
+                    REQUIRE_API_KEY=True,
+                    API_KEY="strict-key",
+                    ALLOWED_HOSTS="api.example.com",
+                    CORS_ALLOW_ORIGINS="https://app.example.com",
+                    RATE_LIMIT_PER_MINUTE=0,
+                )
+            )
+
+
+def test_production_env_enables_strict_security_mode(make_engine):
+    with patch("app.database.create_engine", return_value=make_engine(lambda *_: StubResult())):
+        with pytest.raises(RuntimeError):
+            create_app(
+                Config(
+                    APP_ENV="production",
+                )
+            )
+
+
+def test_strict_security_mode_accepts_secure_configuration(make_engine):
+    with patch("app.database.create_engine", return_value=make_engine(lambda *_: StubResult())):
+        app = create_app(
+            Config(
+                SECURITY_STRICT_MODE=True,
+                REQUIRE_API_KEY=True,
+                API_KEY="strict-key",
+                ALLOWED_HOSTS="api.example.com",
+                CORS_ALLOW_ORIGINS="https://app.example.com",
+                RATE_LIMIT_PER_MINUTE=60,
+            )
+        )
+    assert app is not None
+
+
 def test_rate_limit_enforced_for_protected_endpoint(make_engine):
     with patch("app.database.create_engine", return_value=make_engine(lambda *_: StubResult())):
         app = create_app(

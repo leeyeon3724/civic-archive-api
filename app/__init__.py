@@ -61,6 +61,15 @@ def create_app(config=None):
         raise RuntimeError("RATE_LIMIT_BACKEND=redis requires REDIS_URL to be set.")
     if config.RATE_LIMIT_REDIS_FAILURE_COOLDOWN_SECONDS <= 0:
         raise RuntimeError("RATE_LIMIT_REDIS_FAILURE_COOLDOWN_SECONDS must be greater than 0.")
+    if config.strict_security_mode:
+        if not (config.REQUIRE_API_KEY or config.REQUIRE_JWT):
+            raise RuntimeError("Strict security mode requires REQUIRE_API_KEY=1 or REQUIRE_JWT=1.")
+        if "*" in config.allowed_hosts_list:
+            raise RuntimeError("Strict security mode requires explicit ALLOWED_HOSTS (wildcard is not allowed).")
+        if "*" in config.cors_allow_origins_list:
+            raise RuntimeError("Strict security mode requires explicit CORS_ALLOW_ORIGINS (wildcard is not allowed).")
+        if config.RATE_LIMIT_PER_MINUTE <= 0:
+            raise RuntimeError("Strict security mode requires RATE_LIMIT_PER_MINUTE > 0.")
 
     api.add_middleware(
         CORSMiddleware,
