@@ -18,6 +18,32 @@
 | P7 | Engineering quality hardening | config safety, query correctness, quality gates uplift | Completed |
 | P8 | Architecture decomposition | create_app modularization, bootstrap boundaries, DI prep | Completed |
 
+## P10 Backlog (Current Scope)
+
+### 1) P0 Security Hardening (JWT Secret Strength)
+
+- [x] Add minimum JWT secret length validation (`JWT_SECRET >= 32 bytes`) when `REQUIRE_JWT=1`
+- [x] Keep strict mode policy alignment (strict mode + JWT path also enforces minimum length)
+- [x] Add regression tests for short-secret rejection paths
+
+### 2) P0 Data Correctness Hardening (`published_at` UTC Consistency)
+
+- [x] Normalize `published_at` parser outputs to UTC-aware datetime
+- [x] Enforce DB session timezone as UTC at connection options level
+- [x] Add Alembic migration converting `news_articles.published_at` to `TIMESTAMPTZ`
+- [x] Update API/architecture docs to reflect UTC normalization and storage semantics
+- [x] Extend tests for timezone-aware parsing and runtime wiring assertions
+
+## Definition of Done (P10-Current)
+
+- Unit/contract tests pass
+- Integration tests pass (`RUN_INTEGRATION=1`)
+- Docs-route contract check passes
+- Schema policy check passes
+- Version consistency check passes
+- SLO policy check passes
+- Migration upgrade path passes (`alembic upgrade head`)
+
 ## P1 Backlog (Current Scope)
 
 ### 1) Readiness Probe Split

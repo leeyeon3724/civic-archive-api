@@ -33,6 +33,7 @@
 - 검증 실패는 `400 (VALIDATION_ERROR)`로 응답
 - 인증이 활성화된 경우(`REQUIRE_API_KEY=1`) `/api/*` 요청에 `X-API-Key` 헤더 필수
 - JWT 인증이 활성화된 경우(`REQUIRE_JWT=1`) `/api/*` 요청에 `Authorization: Bearer <token>` 헤더 필수
+  - `JWT_SECRET`: 최소 32 bytes
   - `JWT_ALGORITHM`: 현재 `HS256`만 지원
   - 필수 클레임: `sub`, `exp`
   - 시간 기반 클레임 검증 허용 오차: `JWT_LEEWAY_SECONDS`
@@ -86,6 +87,10 @@
   - `YYYY-MM-DDTHH:MM:SSZ`
   - `YYYY-MM-DD HH:MM:SS`
   - `YYYY-MM-DDTHH:MM:SS`
+  - `YYYY-MM-DDTHH:MM:SS±HH:MM`
+- `published_at`는 UTC-aware(`TIMESTAMPTZ`)로 저장됩니다.
+  - timezone 없는 입력은 UTC로 간주하여 저장
+  - timezone 포함 입력은 UTC로 변환 후 저장
 - 단건 객체/배열(배치) 모두 허용
 - 응답: `{"inserted": <int>, "updated": <int>}` (201)
 - 중복 기준: `url` UNIQUE + upsert

@@ -16,7 +16,8 @@ def init_db(
         "connect_timeout": max(1, int(connect_timeout_seconds)),
         "options": (
             f"-c statement_timeout={max(1, int(statement_timeout_ms))} "
-            "-c application_name=civic_archive_api"
+            "-c application_name=civic_archive_api "
+            "-c timezone=UTC"
         ),
     }
     return create_engine(

@@ -56,7 +56,7 @@ Copy-Item .env.example .env
 | `REQUIRE_API_KEY` | `0` | `1`이면 `/api/*` 엔드포인트에 `X-API-Key` 필수 |
 | `API_KEY` | `` | API 키 값 (`REQUIRE_API_KEY=1`일 때 필수) |
 | `REQUIRE_JWT` | `0` | `1`이면 `/api/*` 엔드포인트에 `Authorization: Bearer <JWT>` 필수 |
-| `JWT_SECRET` | `` | JWT HMAC secret (`REQUIRE_JWT=1`일 때 필수) |
+| `JWT_SECRET` | `` | JWT HMAC secret (`REQUIRE_JWT=1`일 때 필수, 최소 32 bytes) |
 | `JWT_ALGORITHM` | `HS256` | 현재 `HS256`만 지원 |
 | `JWT_LEEWAY_SECONDS` | `0` | JWT 시간 기반 클레임(`exp`/`nbf`) 허용 오차(초) |
 | `JWT_AUDIENCE` | `` | 지정 시 `aud` 클레임 검증 |
@@ -90,11 +90,13 @@ Copy-Item .env.example .env
 - 운영 환경에서는 `REQUIRE_API_KEY=1`, `API_KEY=<secret>` 적용을 권장합니다.
 - 운영 환경에서는 `REQUIRE_JWT=1`과 scope/role 정책 적용을 권장합니다.
 - JWT 검증 시 `sub`, `exp` 클레임은 필수입니다(`JWT_LEEWAY_SECONDS`로 시간 오차 허용 가능).
+- `REQUIRE_JWT=1`이면 `JWT_SECRET`은 최소 32 bytes여야 합니다.
 - `SECURITY_STRICT_MODE=1` 또는 `APP_ENV=production`이면 아래 항목이 강제됩니다.
   - 인증 필수 (`REQUIRE_API_KEY=1` 또는 `REQUIRE_JWT=1`)
   - `ALLOWED_HOSTS` wildcard 금지
   - `CORS_ALLOW_ORIGINS` wildcard 금지
   - `RATE_LIMIT_PER_MINUTE > 0`
+- `published_at`는 UTC-aware(`TIMESTAMPTZ`)로 저장되며, timezone 없는 입력값은 UTC로 정규화됩니다.
 - `RATE_LIMIT_PER_MINUTE`로 `/api/*` 엔드포인트 요청 제한을 활성화할 수 있습니다.
 - 다중 인스턴스 환경에서는 `RATE_LIMIT_BACKEND=redis`, `REDIS_URL=redis://...` 구성을 권장합니다.
 - Redis 장애 시 동작은 `RATE_LIMIT_FAIL_OPEN`과 `RATE_LIMIT_REDIS_FAILURE_COOLDOWN_SECONDS`로 제어합니다.

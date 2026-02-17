@@ -225,7 +225,7 @@ def test_metrics_endpoint_available(integration_client):
 
 def test_runtime_jwt_authorization_path():
     _skip_if_not_enabled()
-    secret = "integration-jwt-secret"
+    secret = "integration-jwt-secret-0123456789"
     now = int(time.time())
     read_token = build_test_jwt(
         secret,

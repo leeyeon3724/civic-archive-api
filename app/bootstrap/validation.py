@@ -2,14 +2,19 @@ from __future__ import annotations
 
 from app.config import Config
 
+JWT_SECRET_MIN_BYTES = 32
+
 
 def validate_startup_config(config: Config) -> None:
     if config.BOOTSTRAP_TABLES_ON_STARTUP:
         raise RuntimeError("BOOTSTRAP_TABLES_ON_STARTUP is disabled. Run 'alembic upgrade head' before startup.")
     if config.REQUIRE_API_KEY and not (config.API_KEY or "").strip():
         raise RuntimeError("REQUIRE_API_KEY=1 requires API_KEY to be set.")
-    if config.REQUIRE_JWT and not (config.JWT_SECRET or "").strip():
+    jwt_secret = (config.JWT_SECRET or "").strip()
+    if config.REQUIRE_JWT and not jwt_secret:
         raise RuntimeError("REQUIRE_JWT=1 requires JWT_SECRET to be set.")
+    if config.REQUIRE_JWT and len(jwt_secret.encode("utf-8")) < JWT_SECRET_MIN_BYTES:
+        raise RuntimeError(f"JWT_SECRET must be at least {JWT_SECRET_MIN_BYTES} bytes.")
     if config.REQUIRE_JWT and (config.JWT_ALGORITHM or "").strip().upper() != "HS256":
         raise RuntimeError("JWT_ALGORITHM must be HS256.")
     if config.JWT_LEEWAY_SECONDS < 0:

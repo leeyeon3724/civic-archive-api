@@ -59,7 +59,8 @@ alembic.ini
 migrations/
 └── versions/
     ├── 35f43b134803_initial_schema.py
-    └── 0df9d6f13c5a_add_segments_dedupe_hash.py
+    ├── 0df9d6f13c5a_add_segments_dedupe_hash.py
+    └── 9c4f6e1a2b7d_make_news_published_at_timestamptz.py
 scripts/
 ├── bootstrap_db.py      # alembic upgrade head 실행
 ├── benchmark_queries.py # 대표 조회 쿼리 성능 회귀 체크
@@ -89,7 +90,7 @@ tests/
 
 | 테이블 | 용도 | 중복 처리 | 핵심 필드 |
 |--------|------|-----------|-----------|
-| `news_articles` | 뉴스/기사 | `url` UNIQUE + upsert | title, url, published_at, content, keywords(JSONB) |
+| `news_articles` | 뉴스/기사 | `url` UNIQUE + upsert | title, url, published_at(TIMESTAMPTZ, UTC), content, keywords(JSONB) |
 | `council_minutes` | 의회 회의록 | `url` UNIQUE + upsert | council, url, meeting_date, content, tag/attendee/agenda(JSONB) |
 | `council_speech_segments` | 발언 단락 | `dedupe_hash` UNIQUE + idempotent insert | council, meeting_date, content, importance, questioner/answerer(JSONB) |
 

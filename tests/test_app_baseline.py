@@ -3,6 +3,7 @@ import time
 from unittest.mock import patch
 
 import pytest
+from datetime import timezone
 from conftest import (
     StubEngine,
     StubResult,
@@ -35,9 +36,12 @@ def _assert_standard_error_shape(payload):
 
 
 def test_parse_datetime_accepts_supported_formats(utils_module):
-    assert utils_module.parse_datetime("2025-08-16T10:32:00Z") == datetime(2025, 8, 16, 10, 32, 0)
-    assert utils_module.parse_datetime("2025-08-16 10:32:00") == datetime(2025, 8, 16, 10, 32, 0)
-    assert utils_module.parse_datetime("2025-08-16T10:32:00") == datetime(2025, 8, 16, 10, 32, 0)
+    assert utils_module.parse_datetime("2025-08-16T10:32:00Z") == datetime(2025, 8, 16, 10, 32, 0, tzinfo=timezone.utc)
+    assert utils_module.parse_datetime("2025-08-16 10:32:00") == datetime(2025, 8, 16, 10, 32, 0, tzinfo=timezone.utc)
+    assert utils_module.parse_datetime("2025-08-16T10:32:00") == datetime(2025, 8, 16, 10, 32, 0, tzinfo=timezone.utc)
+    assert utils_module.parse_datetime("2025-08-16T19:32:00+09:00") == datetime(
+        2025, 8, 16, 10, 32, 0, tzinfo=timezone.utc
+    )
 
 
 def test_parse_datetime_rejects_invalid_format(utils_module):
@@ -541,6 +545,17 @@ def test_jwt_configuration_requires_secret(make_engine):
             )
 
 
+def test_jwt_configuration_rejects_short_secret(make_engine):
+    with patch("app.database.create_engine", return_value=make_engine(lambda *_: StubResult())):
+        with pytest.raises(RuntimeError, match="JWT_SECRET must be at least 32 bytes."):
+            create_app(
+                build_test_config(
+                    REQUIRE_JWT=True,
+                    JWT_SECRET="short-secret",
+                )
+            )
+
+
 def test_jwt_algorithm_must_be_hs256(make_engine):
     with patch("app.database.create_engine", return_value=make_engine(lambda *_: StubResult())):
         with pytest.raises(RuntimeError):
@@ -646,6 +661,21 @@ def test_strict_security_mode_accepts_secure_configuration(make_engine):
             )
         )
     assert app is not None
+
+
+def test_strict_security_mode_rejects_short_jwt_secret_when_jwt_enabled(make_engine):
+    with patch("app.database.create_engine", return_value=make_engine(lambda *_: StubResult())):
+        with pytest.raises(RuntimeError, match="JWT_SECRET must be at least 32 bytes."):
+            create_app(
+                build_test_config(
+                    SECURITY_STRICT_MODE=True,
+                    REQUIRE_JWT=True,
+                    JWT_SECRET="short-secret",
+                    ALLOWED_HOSTS="api.example.com",
+                    CORS_ALLOW_ORIGINS="https://app.example.com",
+                    RATE_LIMIT_PER_MINUTE=60,
+                )
+            )
 
 
 def test_rate_limit_enforced_for_protected_endpoint(make_engine):
@@ -829,6 +859,7 @@ def test_create_app_applies_database_runtime_tuning():
     assert init_kwargs["connect_args"]["connect_timeout"] == 4
     assert "statement_timeout=4500" in init_kwargs["connect_args"]["options"]
     assert "application_name=civic_archive_api" in init_kwargs["connect_args"]["options"]
+    assert "timezone=UTC" in init_kwargs["connect_args"]["options"]
 
 
 @pytest.mark.parametrize(
