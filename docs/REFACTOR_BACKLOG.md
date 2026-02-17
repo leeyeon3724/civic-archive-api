@@ -235,9 +235,9 @@
 - [x] Add lint gate (`ruff check`) to CI
 - [x] Add coverage gate (`pytest --cov --cov-fail-under`) to CI
 - [x] Remove current lint violations from scripts/tests
-- [x] Phase-1 mypy rollout plan definition (non-blocking baseline)
-  - scope: `app/config.py`, `app/security.py`, `scripts/*` 우선 적용
-  - rollout: CI `warn` 모드로 1차 도입 후 모듈별 오탐 정리 뒤 `fail` 승격
+- [x] Phase-1 mypy rollout execution (non-blocking baseline)
+  - scope: `app/config.py`, `app/security.py`, `app/services/*`, `app/ports/*`, `scripts/*`
+  - rollout: CI `warn` mode (`scripts/check_mypy.py --mode warn`) with later promotion to `fail`
 
 ### 4) Maintainability Refactor Preparation
 
@@ -282,7 +282,14 @@
   - phase 1 (completed): `app/repositories/session_provider.py` default provider wraps global engine scope
   - phase 2 (completed): repository functions support optional injected `connection_provider`
   - phase 3 (completed): service layer constructor/provider injection + route `Depends` wiring
+  - phase 3.1 (completed): service/repository port interfaces extracted to `app/ports/*`
   - test migration (completed): endpoint tests use dependency override fixture for service DI
+
+### 4) Typecheck Scope Expansion (Phase-1)
+
+- [x] Add mypy config/wrapper (`mypy.ini`, `scripts/check_mypy.py`)
+- [x] Extend phase-1 target scope to include service layer and ports
+- [x] Add CI phase-1 mypy step in warn mode (non-blocking baseline)
 
 ## Definition of Done (P8-Current)
 

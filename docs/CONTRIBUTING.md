@@ -63,6 +63,7 @@ PR 본문에 아래 항목을 포함합니다.
 
 - `python scripts/check_commit_messages.py --rev-range origin/main..HEAD --mode fail`
 - `python -m ruff check app tests scripts`
+- `python scripts/check_mypy.py --mode warn` (phase-1, non-blocking baseline)
 - `python -m pytest -q -m "not e2e and not integration" --cov=app --cov-report=term --cov-fail-under=85`
 - `python scripts/check_docs_routes.py`
 - `python scripts/check_schema_policy.py`

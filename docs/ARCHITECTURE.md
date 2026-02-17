@@ -34,6 +34,9 @@ app/
 │   └── exception_handlers.py
 ├── schemas.py           # Pydantic 요청/응답 모델
 ├── utils.py             # 파서/페이로드 검증 공통 함수
+├── ports/               # 서비스/리포지토리 포트 인터페이스 (Protocol)
+│   ├── repositories.py
+│   └── services.py
 ├── services/            # 입력 정규화/검증 레이어
 │   ├── providers.py     # FastAPI Depends용 서비스 provider
 │   ├── news_service.py
@@ -60,6 +63,7 @@ scripts/
 ├── benchmark_queries.py # 대표 조회 쿼리 성능 회귀 체크
 ├── check_commit_messages.py # 커밋 메시지 정책 검사 (Conventional Commits + scope)
 ├── check_docs_routes.py # API.md 라우트 계약 + README 링크 검사
+├── check_mypy.py        # mypy phase-1 타입체크 래퍼 (warn/fail 모드)
 ├── check_schema_policy.py # 런타임 수동 DDL 금지 정책 검사
 ├── check_slo_policy.py  # SLO 정책 문서 기준선 검사
 ├── check_runtime_health.py # 배포 전 liveness/readiness 가드 검사
@@ -131,6 +135,8 @@ ASGI 엔트리포인트: `app.main:app`
 - ingest 안전 가드: `INGEST_MAX_BATCH_ITEMS`, `MAX_REQUEST_BODY_BYTES` 기반으로 oversized 요청을 `413`으로 차단
 - DB DI 준비: `app/repositories/session_provider.py`로 connection scope 추상화, repository는 선택적 `connection_provider` 주입 지원
 - 서비스 DI: `app/services/providers.py`에서 request 단위 `get_*_service` provider를 통해 route 계층에 주입
+- 포트 분리: `app/ports/services.py`, `app/ports/repositories.py`에 Protocol 인터페이스를 모아 계층 결합도 축소
+- 타입체크 phase-1: `mypy.ini` + `scripts/check_mypy.py` (기본 warn, 이후 fail 승격 준비)
 - 성능 회귀 체크: `scripts/benchmark_queries.py` + avg/p95 threshold 검사
 - 성능 임계값 프로파일: `docs/PERFORMANCE.md` + `scripts/benchmark_queries.py --profile <dev|staging|prod>`
 - 문서-코드 정합성: `scripts/check_docs_routes.py` + CI
