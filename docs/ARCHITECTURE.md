@@ -107,9 +107,10 @@ ASGI 엔트리포인트: `app.main:app`
 - 요청/응답 검증: FastAPI + Pydantic 모델 기반으로 OpenAPI 자동 문서화
 - 에러 표준화: `code/message/error/request_id/details` 단일 포맷
 - 관측성: request-id 미들웨어, 구조화 로그, `/metrics` 메트릭 (라우트 미매칭은 `/_unmatched`, 알 수 없는 HTTP method는 `OTHER` 라벨로 고정)
-- 보안 기본선: API key 선택적 강제(`REQUIRE_API_KEY`), IP rate-limit(`RATE_LIMIT_PER_MINUTE`)
+- 보안 기본선: API key 선택적 강제(`REQUIRE_API_KEY`), JWT 인증/인가(`REQUIRE_JWT` + scope/role), IP rate-limit(`RATE_LIMIT_PER_MINUTE`)
 - 분산 rate-limit: `RATE_LIMIT_BACKEND=redis`, `REDIS_URL`로 멀티 인스턴스 환경 지원
 - Redis limiter 안정화: 장애 시 쿨다운(`RATE_LIMIT_REDIS_FAILURE_COOLDOWN_SECONDS`) + fallback(`RATE_LIMIT_FAIL_OPEN`) 지원
+- 프록시 신뢰 경계: `TRUSTED_PROXY_CIDRS`에 매치되는 원격 IP에서만 `X-Forwarded-For`를 신뢰
 - 성능 회귀 체크: `scripts/benchmark_queries.py` + avg/p95 threshold 검사
 - 문서-코드 정합성: `scripts/check_docs_routes.py` + CI
 - 버전 정합성: `scripts/check_version_consistency.py` + CI

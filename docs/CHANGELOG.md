@@ -15,6 +15,8 @@
 - 운영 헬스 분리를 위한 `GET /health/live`, `GET /health/ready` 엔드포인트 추가
 - `council_speech_segments.dedupe_hash` 및 고유 인덱스(중복 삽입 방지) 마이그레이션 추가
 - Redis rate limiter 운영 강화 옵션 추가 (`RATE_LIMIT_FAIL_OPEN`, `RATE_LIMIT_REDIS_FAILURE_COOLDOWN_SECONDS`)
+- JWT 인증/인가 옵션 추가 (`REQUIRE_JWT`, HS256 검증, 메서드별 scope, admin role 우회)
+- trusted proxy 경계 설정 추가 (`TRUSTED_PROXY_CIDRS`, 신뢰 CIDR에서만 `X-Forwarded-For` 사용)
 
 ### 변경됨
 
@@ -24,6 +26,7 @@
 - `/api/segments` 삽입 동작을 정규화 payload 기반 idempotent insert로 변경 (`ON CONFLICT DO NOTHING`)
 - metrics cardinality 보호 강화를 위해 알 수 없는 HTTP method 라벨을 `OTHER`로 정규화
 - 버전 정합성 검사 강화: changelog 구조 검증(`Unreleased`, 최신 릴리스 섹션) 및 release-tag 워크플로우 연동
+- `/api/*` 공통 에러 응답에 `403 (FORBIDDEN)` 계약 추가
 
 ### 수정됨
 

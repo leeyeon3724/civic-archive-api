@@ -10,8 +10,8 @@
 | Priority | Theme | Tasks | Status |
 |----------|-------|-------|--------|
 | P1 | Operational baseline and correctness | readiness (DB/Redis), segments idempotency, mojibake cleanup | Completed |
-| P2 | Operations hardening | Redis rate limiter hardening, metrics cardinality protection, version policy automation | In Progress |
-| P3 | Security and operations hardening | JWT/RBAC, trusted proxy chain validation, SBOM/vulnerability scan | Pending |
+| P2 | Operations hardening | Redis rate limiter hardening, metrics cardinality protection, version policy automation | Completed |
+| P3 | Security and operations hardening | JWT/RBAC, trusted proxy chain validation, SBOM/vulnerability scan | In Progress |
 | P4 | SLO and observability ops | SLI/SLO, error budget policy, alert policy | Pending |
 
 ## P1 Backlog (Current Scope)
@@ -67,6 +67,41 @@
 - [ ] Add dedicated script unit tests (deferred to P3 quality pass)
 
 ## Definition of Done (P2)
+
+- Unit/contract tests pass
+- Docs-route contract check passes
+- Schema policy check passes
+- Version consistency check passes
+- `docs/CHANGELOG.md` updated
+
+## P3 Backlog (Current Scope)
+
+### 1) Trusted Proxy Chain Validation
+
+- [x] Add trusted proxy CIDR configuration (`TRUSTED_PROXY_CIDRS`)
+- [x] Use `X-Forwarded-For` only when remote peer is in trusted CIDR
+- [x] Add regression tests for trusted/untrusted proxy behavior
+
+### 2) JWT + RBAC
+
+- [x] Add optional JWT authentication (`REQUIRE_JWT`, `JWT_SECRET`, HS256 validation)
+- [x] Add claim validation (`exp`, optional `aud`, optional `iss`)
+- [x] Add method-scope authorization (`JWT_SCOPE_READ/WRITE/DELETE`)
+- [x] Add admin role bypass (`JWT_ADMIN_ROLE`)
+- [x] Add regression tests for unauthorized/forbidden/authorized flows
+
+### 3) Safety Guardrails (Ops Defaults)
+
+- [x] Add startup validation for JWT config and algorithm support
+- [x] Extend common error contracts with `403 FORBIDDEN`
+- [ ] Add production profile presets for strict defaults (deferred to next P3 patch)
+
+### 4) Supply Chain Baseline
+
+- [ ] Add SBOM generation/check workflow
+- [ ] Add vulnerability scanning workflow
+
+## Definition of Done (P3-Current)
 
 - Unit/contract tests pass
 - Docs-route contract check passes
