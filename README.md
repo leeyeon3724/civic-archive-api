@@ -38,6 +38,12 @@ Copy-Item .env.example .env
 | `POSTGRES_USER` | `app_user` | DB 사용자 |
 | `POSTGRES_PASSWORD` | `change_me` | DB 비밀번호 |
 | `POSTGRES_DB` | `civic_archive` | DB 이름 |
+| `DB_POOL_SIZE` | `10` | SQLAlchemy 커넥션 풀 기본 크기 |
+| `DB_MAX_OVERFLOW` | `20` | 풀 초과 허용 커넥션 수 |
+| `DB_POOL_TIMEOUT_SECONDS` | `30` | 풀 커넥션 획득 대기 시간(초) |
+| `DB_POOL_RECYCLE_SECONDS` | `3600` | 유휴 커넥션 재생성 주기(초) |
+| `DB_CONNECT_TIMEOUT_SECONDS` | `3` | DB TCP 연결 타임아웃(초) |
+| `DB_STATEMENT_TIMEOUT_MS` | `5000` | PostgreSQL statement timeout(ms) |
 | `DEBUG` | `0` | 서버 debug/reload 모드 |
 | `APP_ENV` | `development` | 실행 환경 (`development`/`staging`/`production`) |
 | `SECURITY_STRICT_MODE` | `0` | `1`이면 운영 보안 가드 강제(아래 설명 참고) |

@@ -13,6 +13,7 @@
 | P2 | Operations hardening | Redis rate limiter hardening, metrics cardinality protection, version policy automation | Completed |
 | P3 | Security and operations hardening | JWT/RBAC, trusted proxy chain validation, SBOM/vulnerability scan | Completed |
 | P4 | SLO and observability ops | SLI/SLO, error budget policy, alert policy | Completed |
+| P5 | Performance and scalability baseline | DB pool/runtime timeout tuning, query latency guardrails | In Progress |
 
 ## P1 Backlog (Current Scope)
 
@@ -136,6 +137,36 @@
 - [x] Integrate SLO policy check into CI (`docs-contract.yml`)
 
 ## Definition of Done (P4-Current)
+
+- Unit/contract tests pass
+- Docs-route contract check passes
+- Schema policy check passes
+- Version consistency check passes
+- SLO policy check passes
+- `docs/CHANGELOG.md` updated
+
+## P5 Backlog (Current Scope)
+
+### 1) DB Runtime Tuning Baseline
+
+- [x] Add DB pool sizing configuration (`DB_POOL_SIZE`, `DB_MAX_OVERFLOW`, `DB_POOL_TIMEOUT_SECONDS`, `DB_POOL_RECYCLE_SECONDS`)
+- [x] Add DB connectivity/runtime timeout configuration (`DB_CONNECT_TIMEOUT_SECONDS`, `DB_STATEMENT_TIMEOUT_MS`)
+- [x] Enforce startup validation for invalid DB runtime tuning values
+- [x] Add regression tests for DB runtime tuning wiring/validation
+
+### 2) Query Latency Guardrails
+
+- [ ] Define endpoint-level latency budgets and threshold mapping (news/minutes/segments)
+- [ ] Add benchmark scenario tags and threshold profiles (dev/staging/prod)
+- [ ] Add release-note template item for benchmark delta reporting
+
+### 3) Throughput and Load Safety
+
+- [ ] Define batch ingest limits and fallback behavior for oversized payloads
+- [ ] Add request-size/load-shedding guard policy draft
+- [ ] Link throughput guardrails to runbook checklist
+
+## Definition of Done (P5-In Progress)
 
 - Unit/contract tests pass
 - Docs-route contract check passes

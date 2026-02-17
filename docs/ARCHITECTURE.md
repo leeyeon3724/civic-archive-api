@@ -84,7 +84,7 @@ create_app()
   -> BOOTSTRAP_TABLES_ON_STARTUP=1 이면 즉시 실패(정책 위반 방지)
   -> CORS/TrustedHost 미들웨어 등록
   -> configure_logging()                # JSON 로그 포맷
-  -> init_db(DATABASE_URL)
+  -> init_db(DATABASE_URL + pool/timeout runtime tuning)
   -> API 보호 의존성(api-key/rate-limit) 구성
   -> register_observability()           # X-Request-Id + metrics + request logging
   -> register_routes(dependencies=...)  # APIRouter 등록
@@ -114,6 +114,7 @@ ASGI 엔트리포인트: `app.main:app`
 - Redis limiter 안정화: 장애 시 쿨다운(`RATE_LIMIT_REDIS_FAILURE_COOLDOWN_SECONDS`) + fallback(`RATE_LIMIT_FAIL_OPEN`) 지원
 - 프록시 신뢰 경계: `TRUSTED_PROXY_CIDRS`에 매치되는 원격 IP에서만 `X-Forwarded-For`를 신뢰
 - 운영 strict 모드: `SECURITY_STRICT_MODE=1` 또는 `APP_ENV=production`에서 인증/호스트/CORS/rate-limit 가드 강제
+- DB 런타임 튜닝: `DB_POOL_SIZE`, `DB_MAX_OVERFLOW`, `DB_POOL_TIMEOUT_SECONDS`, `DB_CONNECT_TIMEOUT_SECONDS`, `DB_STATEMENT_TIMEOUT_MS`
 - 성능 회귀 체크: `scripts/benchmark_queries.py` + avg/p95 threshold 검사
 - 문서-코드 정합성: `scripts/check_docs_routes.py` + CI
 - 버전 정합성: `scripts/check_version_consistency.py` + CI
