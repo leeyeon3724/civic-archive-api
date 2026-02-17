@@ -21,14 +21,29 @@
 
 ## 커밋 메시지 규칙
 
-Conventional Commits를 사용합니다.
+Conventional Commits를 사용하며, 즉시 강제 규칙은 아래와 같습니다.
+
+- 필수 형식: `<type>(<scope>): <subject>`
+- 허용 type: `feat`, `fix`, `docs`, `refactor`, `chore`, `test`, `ci`, `build`, `perf`, `revert`
+- 허용 scope: `p<digit...>`, `api`, `db`, `ops`, `security`, `deps`, `docs`, `ci`, `release`, `bench`, `infra`
+- subject 규칙:
+  - 시작 문자는 소문자/숫자
+  - 마침표(`.`)로 끝나면 안 됨
+  - 최대 72자
 
 예시:
 
-- `feat: add request-id propagation in middleware`
-- `fix: handle validation error payload consistently`
-- `docs: update api security headers`
-- `chore: tighten benchmark thresholds`
+- `feat(p5): add profile-based benchmark guardrails`
+- `docs(api): update payload size guard behavior`
+- `chore(ci): add commit message validation workflow`
+
+검사 명령:
+
+- `python scripts/check_commit_messages.py --rev-range origin/main..HEAD --mode fail`
+
+로컬 훅 설치(권장):
+
+- `powershell -ExecutionPolicy Bypass -File scripts/install_git_hooks.ps1`
 
 ## Pull Request 작성 규칙
 
@@ -41,6 +56,7 @@ PR 본문에 아래 항목을 포함합니다.
 
 ## 머지 전 필수 검증
 
+- `python scripts/check_commit_messages.py --rev-range origin/main..HEAD --mode fail`
 - `python -m pytest -q -m "not e2e and not integration"`
 - `python scripts/check_docs_routes.py`
 - `python scripts/check_schema_policy.py`

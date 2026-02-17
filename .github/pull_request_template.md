@@ -17,6 +17,7 @@
 
 ## 기본 체크리스트
 
+- [ ] `python scripts/check_commit_messages.py --rev-range origin/main..HEAD --mode fail` 실행
 - [ ] `python -m pytest -q -m "not e2e and not integration"` 실행
 - [ ] `python scripts/check_docs_routes.py` 실행
 - [ ] `python scripts/check_schema_policy.py` 실행

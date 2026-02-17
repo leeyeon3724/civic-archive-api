@@ -126,6 +126,9 @@ python -m alembic downgrade -1
 ## 품질 게이트
 
 ```bash
+# 커밋 메시지 정책 검사 (브랜치 기준)
+python scripts/check_commit_messages.py --rev-range origin/main..HEAD --mode fail
+
 # 문서-코드 라우트 계약 검사 (API.md 기준 + README 링크 확인)
 python scripts/check_docs_routes.py
 

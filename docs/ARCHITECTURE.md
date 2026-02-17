@@ -49,11 +49,13 @@ migrations/
 scripts/
 ├── bootstrap_db.py      # alembic upgrade head 실행
 ├── benchmark_queries.py # 대표 조회 쿼리 성능 회귀 체크
+├── check_commit_messages.py # 커밋 메시지 정책 검사 (Conventional Commits + scope)
 ├── check_docs_routes.py # API.md 라우트 계약 + README 링크 검사
 ├── check_schema_policy.py # 런타임 수동 DDL 금지 정책 검사
 ├── check_slo_policy.py  # SLO 정책 문서 기준선 검사
 ├── check_runtime_health.py # 배포 전 liveness/readiness 가드 검사
-└── check_version_consistency.py # APP_VERSION <-> app/__init__.py <-> CHANGELOG 정합성 검사
+├── check_version_consistency.py # APP_VERSION <-> app/__init__.py <-> CHANGELOG 정합성 검사
+└── install_git_hooks.ps1 # commit-msg 훅 설치 스크립트
 Dockerfile
 docker-compose.yml
 tests/
@@ -120,6 +122,7 @@ ASGI 엔트리포인트: `app.main:app`
 - 성능 회귀 체크: `scripts/benchmark_queries.py` + avg/p95 threshold 검사
 - 성능 임계값 프로파일: `docs/PERFORMANCE.md` + `scripts/benchmark_queries.py --profile <dev|staging|prod>`
 - 문서-코드 정합성: `scripts/check_docs_routes.py` + CI
+- 커밋 메시지 정책: `scripts/check_commit_messages.py` + `.github/workflows/commit-message.yml`
 - 버전 정합성: `scripts/check_version_consistency.py` + CI
 - 공급망 보안: `.github/workflows/security-supply-chain.yml` (CycloneDX SBOM + pip-audit)
 - SLO 운영 가드: `docs/SLO.md`, `docs/OPERATIONS.md`, `scripts/check_slo_policy.py`, `scripts/check_runtime_health.py`
