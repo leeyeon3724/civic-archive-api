@@ -2,6 +2,7 @@
 
 
 from app.services.providers import get_minutes_service, get_segments_service
+from conftest import extract_first_select_params
 
 
 def _assert_not_found_error(payload):
@@ -9,6 +10,16 @@ def _assert_not_found_error(payload):
     assert payload["code"] == "NOT_FOUND"
     assert payload["message"] == "Not Found"
     assert payload.get("request_id")
+
+
+def _assert_common_list_select_params(first_select_params):
+    assert first_select_params["limit"] == 1
+    assert first_select_params["offset"] == 1
+    assert first_select_params["q"] == "%budget%"
+    assert first_select_params["council"] == "A"
+    assert first_select_params["committee"] == "B"
+    assert first_select_params["session"] == "C"
+    assert first_select_params["meeting_no"] == "C 1th"
 
 
 def test_app_init_does_not_execute_manual_ddl(app_instance):
@@ -136,18 +147,10 @@ def test_list_minutes_returns_paginated_payload_and_filter_params(client, use_st
     assert data["total"] == 1
     assert data["items"][0]["id"] == 101
 
-    first_select = next(
-        c for c in engine.connection.calls if isinstance(c.get("params"), dict) and "limit" in c["params"]
-    )
-    assert first_select["params"]["limit"] == 1
-    assert first_select["params"]["offset"] == 1
-    assert first_select["params"]["q"] == "%budget%"
-    assert first_select["params"]["council"] == "A"
-    assert first_select["params"]["committee"] == "B"
-    assert first_select["params"]["session"] == "C"
-    assert first_select["params"]["meeting_no"] == "C 1th"
-    assert first_select["params"]["date_from"] == "2025-01-01"
-    assert first_select["params"]["date_to"] == "2025-01-31"
+    first_select_params = extract_first_select_params(engine)
+    _assert_common_list_select_params(first_select_params)
+    assert first_select_params["date_from"] == "2025-01-01"
+    assert first_select_params["date_to"] == "2025-01-31"
 
 
 def test_get_minutes_success_and_404(client, use_stub_connection_provider):
@@ -278,22 +281,14 @@ def test_list_segments_returns_paginated_payload_and_filter_params(client, use_s
     assert data["total"] == 1
     assert data["items"][0]["id"] == 501
 
-    first_select = next(
-        c for c in engine.connection.calls if isinstance(c.get("params"), dict) and "limit" in c["params"]
-    )
-    assert first_select["params"]["limit"] == 1
-    assert first_select["params"]["offset"] == 1
-    assert first_select["params"]["q"] == "%budget%"
-    assert first_select["params"]["council"] == "A"
-    assert first_select["params"]["committee"] == "B"
-    assert first_select["params"]["session"] == "C"
-    assert first_select["params"]["meeting_no"] == "C 1th"
-    assert first_select["params"]["importance"] == 2
-    assert first_select["params"]["party"] == "P"
-    assert first_select["params"]["constituency"] == "X"
-    assert first_select["params"]["department"] == "D"
-    assert first_select["params"]["date_from"] == "2025-01-01"
-    assert first_select["params"]["date_to"] == "2025-01-31"
+    first_select_params = extract_first_select_params(engine)
+    _assert_common_list_select_params(first_select_params)
+    assert first_select_params["importance"] == 2
+    assert first_select_params["party"] == "P"
+    assert first_select_params["constituency"] == "X"
+    assert first_select_params["department"] == "D"
+    assert first_select_params["date_from"] == "2025-01-01"
+    assert first_select_params["date_to"] == "2025-01-31"
 
 
 def test_get_segment_success_and_404(client, use_stub_connection_provider):

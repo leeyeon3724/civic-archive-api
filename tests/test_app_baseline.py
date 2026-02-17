@@ -1,13 +1,17 @@
 ﻿from datetime import datetime
-import base64
-import hashlib
-import hmac
-import json
 import time
 from unittest.mock import patch
 
 import pytest
-from conftest import StubEngine, StubResult, build_test_config
+from conftest import (
+    StubEngine,
+    StubResult,
+    assert_payload_too_large_response,
+    build_test_config,
+    build_test_jwt,
+    extract_first_select_params,
+    oversized_echo_body,
+)
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from sqlalchemy.engine import make_url
@@ -28,21 +32,6 @@ def _assert_standard_error_shape(payload):
     assert isinstance(payload.get("message"), str) and payload["message"]
     assert isinstance(payload.get("error"), str) and payload["error"]
     assert isinstance(payload.get("request_id"), str) and payload["request_id"]
-
-
-def _build_jwt(secret: str, claims: dict) -> str:
-    header = {"alg": "HS256", "typ": "JWT"}
-
-    def _encode(value: dict) -> str:
-        raw = json.dumps(value, separators=(",", ":"), sort_keys=True).encode("utf-8")
-        return base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")
-
-    header_b64 = _encode(header)
-    payload_b64 = _encode(claims)
-    signing_input = f"{header_b64}.{payload_b64}".encode("ascii")
-    signature = hmac.new(secret.encode("utf-8"), signing_input, hashlib.sha256).digest()
-    signature_b64 = base64.urlsafe_b64encode(signature).decode("ascii").rstrip("=")
-    return f"{header_b64}.{payload_b64}.{signature_b64}"
 
 
 def test_parse_datetime_accepts_supported_formats(utils_module):
@@ -83,7 +72,7 @@ def test_normalize_minutes_converts_numeric_meeting_no(minutes_module):
         }
     )
     assert result["meeting_no"] == 3
-    assert result["meeting_no_combined"] == "29th 3차"
+    assert result["meeting_no_combined"] == "29th 3\ucc28"
 
 
 def test_normalize_segment_validates_importance(segments_module):
@@ -237,12 +226,10 @@ def test_list_news_returns_paginated_payload(client, use_stub_connection_provide
     assert data["total"] == 1
     assert data["items"][0]["id"] == 10
 
-    first_select = next(
-        c for c in engine.connection.calls if isinstance(c.get("params"), dict) and "limit" in c["params"]
-    )
-    assert first_select["params"]["limit"] == 1
-    assert first_select["params"]["offset"] == 1
-    assert first_select["params"]["q"] == "%budget%"
+    first_select_params = extract_first_select_params(engine)
+    assert first_select_params["limit"] == 1
+    assert first_select_params["offset"] == 1
+    assert first_select_params["q"] == "%budget%"
 
 
 def test_get_news_404_when_not_found(client, use_stub_connection_provider):
@@ -374,7 +361,7 @@ def test_api_key_required_for_protected_endpoint(make_engine):
 def test_jwt_required_for_protected_endpoint(make_engine):
     secret = "jwt-test-secret-0123456789abcdef"
     now = int(time.time())
-    write_token = _build_jwt(
+    write_token = build_test_jwt(
         secret,
         {
             "sub": "user-1",
@@ -412,7 +399,7 @@ def test_jwt_required_for_protected_endpoint(make_engine):
 def test_jwt_forbidden_without_required_scope(make_engine):
     secret = "jwt-scope-test-secret-0123456789ab"
     now = int(time.time())
-    read_only_token = _build_jwt(
+    read_only_token = build_test_jwt(
         secret,
         {
             "sub": "user-2",
@@ -442,7 +429,7 @@ def test_jwt_forbidden_without_required_scope(make_engine):
 def test_jwt_admin_role_bypasses_scope_checks(make_engine):
     secret = "jwt-admin-test-secret-0123456789ab"
     now = int(time.time())
-    admin_token = _build_jwt(
+    admin_token = build_test_jwt(
         secret,
         {
             "sub": "admin-1",
@@ -471,14 +458,14 @@ def test_jwt_admin_role_bypasses_scope_checks(make_engine):
 def test_jwt_rejects_tokens_missing_required_sub_or_exp(make_engine):
     secret = "jwt-required-claims-secret-012345"
     now = int(time.time())
-    missing_sub = _build_jwt(
+    missing_sub = build_test_jwt(
         secret,
         {
             "scope": "archive:write",
             "exp": now + 300,
         },
     )
-    missing_exp = _build_jwt(
+    missing_exp = build_test_jwt(
         secret,
         {
             "sub": "user-required-claims",
@@ -515,7 +502,7 @@ def test_jwt_rejects_tokens_missing_required_sub_or_exp(make_engine):
 def test_jwt_leeway_allows_slightly_expired_token(make_engine):
     secret = "jwt-leeway-secret-0123456789abcdef"
     now = int(time.time())
-    write_token = _build_jwt(
+    write_token = build_test_jwt(
         secret,
         {
             "sub": "user-leeway",
@@ -887,17 +874,13 @@ def test_request_size_guard_rejects_large_content_length(make_engine):
         app = create_app(build_test_config(MAX_REQUEST_BODY_BYTES=64))
 
     with TestClient(app) as tc:
-        body = '{"payload":"' + ("x" * 200) + '"}'
+        body = oversized_echo_body()
         response = tc.post(
             "/api/echo",
             content=body,
             headers={"Content-Type": "application/json"},
         )
-        assert response.status_code == 413
-        payload = response.json()
-        assert payload["code"] == "PAYLOAD_TOO_LARGE"
-        assert payload["message"] == "Payload Too Large"
-        assert payload["details"]["max_request_body_bytes"] == 64
+        payload = assert_payload_too_large_response(response, max_request_body_bytes=64)
         assert payload["details"]["content_length"] > 64
 
 
