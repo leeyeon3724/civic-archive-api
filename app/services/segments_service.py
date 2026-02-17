@@ -1,11 +1,17 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any
 
+from app.repositories.segments_repository import (
+    delete_segment as repository_delete_segment,
+    get_segment as repository_get_segment,
+    insert_segments as repository_insert_segments,
+    list_segments as repository_list_segments,
+)
 from app.utils import bad_request, combine_meeting_no, parse_date
 
 
-def normalize_segment(item: Dict[str, Any]) -> Dict[str, Any]:
+def normalize_segment(item: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(item, dict):
         raise bad_request("각 아이템은 JSON 객체여야 합니다.")
 
@@ -46,7 +52,7 @@ def normalize_segment(item: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def parse_importance_value(raw: Any, *, required: bool) -> Optional[int]:
+def parse_importance_value(raw: Any, *, required: bool) -> int | None:
     if raw is None:
         if required:
             raise bad_request("importance는 1,2,3 중 정수여야 합니다.")
@@ -63,7 +69,7 @@ def parse_importance_value(raw: Any, *, required: bool) -> Optional[int]:
     return value
 
 
-def parse_importance_query(raw: Optional[str]) -> Optional[int]:
+def parse_importance_query(raw: str | None) -> int | None:
     if raw is None:
         return None
     try:
@@ -73,3 +79,48 @@ def parse_importance_query(raw: Optional[str]) -> Optional[int]:
     if value not in (1, 2, 3):
         raise bad_request("importance는 1,2,3 중 하나여야 합니다.")
     return value
+
+
+def insert_segments(items: list[dict[str, Any]]) -> int:
+    return repository_insert_segments(items)
+
+
+def list_segments(
+    *,
+    q: str | None,
+    council: str | None,
+    committee: str | None,
+    session: str | None,
+    meeting_no: str | None,
+    importance: int | None,
+    party: str | None,
+    constituency: str | None,
+    department: str | None,
+    date_from: str | None,
+    date_to: str | None,
+    page: int,
+    size: int,
+) -> tuple[list[dict[str, Any]], int]:
+    return repository_list_segments(
+        q=q,
+        council=council,
+        committee=committee,
+        session=session,
+        meeting_no=meeting_no,
+        importance=importance,
+        party=party,
+        constituency=constituency,
+        department=department,
+        date_from=date_from,
+        date_to=date_to,
+        page=page,
+        size=size,
+    )
+
+
+def get_segment(item_id: int) -> dict[str, Any] | None:
+    return repository_get_segment(item_id)
+
+
+def delete_segment(item_id: int) -> bool:
+    return repository_delete_segment(item_id)

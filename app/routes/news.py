@@ -12,8 +12,7 @@ from app.schemas import (
     NewsUpsertPayload,
     UpsertResponse,
 )
-from app.repositories.news_repository import delete_article, get_article, list_articles, upsert_articles
-from app.services.news_service import normalize_article
+from app.services.news_service import delete_article, get_article, list_articles, normalize_article, upsert_articles
 
 router = APIRouter(tags=["news"])
 

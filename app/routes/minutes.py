@@ -6,14 +6,12 @@ from fastapi import APIRouter, Body, Query
 from app.errors import http_error
 from app.routes.common import ERROR_RESPONSES
 from app.schemas import DeleteResponse, MinutesItemDetail, MinutesListResponse, MinutesUpsertPayload, UpsertResponse
-from app.repositories.minutes_repository import (
+from app.services.minutes_service import (
     delete_minutes as delete_minutes_item,
     get_minutes as get_minutes_item,
     list_minutes as list_minutes_items,
-    upsert_minutes,
-)
-from app.services.minutes_service import (
     normalize_minutes,
+    upsert_minutes,
 )
 
 router = APIRouter(tags=["minutes"])

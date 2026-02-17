@@ -12,13 +12,11 @@ from app.schemas import (
     SegmentsItemDetail,
     SegmentsListResponse,
 )
-from app.repositories.segments_repository import (
+from app.services.segments_service import (
     delete_segment as delete_segment_item,
     get_segment as get_segment_item,
     insert_segments,
     list_segments as list_segments_items,
-)
-from app.services.segments_service import (
     normalize_segment,
 )
 

@@ -1,11 +1,17 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any
 
+from app.repositories.minutes_repository import (
+    delete_minutes as repository_delete_minutes,
+    get_minutes as repository_get_minutes,
+    list_minutes as repository_list_minutes,
+    upsert_minutes as repository_upsert_minutes,
+)
 from app.utils import bad_request, combine_meeting_no, parse_date
 
 
-def normalize_minutes(item: Dict[str, Any]) -> Dict[str, Any]:
+def normalize_minutes(item: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(item, dict):
         raise bad_request("각 아이템은 JSON 객체여야 합니다.")
 
@@ -39,3 +45,40 @@ def normalize_minutes(item: Dict[str, Any]) -> Dict[str, Any]:
         "attendee": item.get("attendee"),
         "agenda": item.get("agenda"),
     }
+
+
+def upsert_minutes(items: list[dict[str, Any]]) -> tuple[int, int]:
+    return repository_upsert_minutes(items)
+
+
+def list_minutes(
+    *,
+    q: str | None,
+    council: str | None,
+    committee: str | None,
+    session: str | None,
+    meeting_no: str | None,
+    date_from: str | None,
+    date_to: str | None,
+    page: int,
+    size: int,
+) -> tuple[list[dict[str, Any]], int]:
+    return repository_list_minutes(
+        q=q,
+        council=council,
+        committee=committee,
+        session=session,
+        meeting_no=meeting_no,
+        date_from=date_from,
+        date_to=date_to,
+        page=page,
+        size=size,
+    )
+
+
+def get_minutes(item_id: int) -> dict[str, Any] | None:
+    return repository_get_minutes(item_id)
+
+
+def delete_minutes(item_id: int) -> bool:
+    return repository_delete_minutes(item_id)
