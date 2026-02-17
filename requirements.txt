@@ -6,3 +6,4 @@ alembic==1.18.4
 pydantic-settings>=2.7
 prometheus-client>=0.22
 redis>=5.0
+PyJWT>=2.8,<3

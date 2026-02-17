@@ -10,6 +10,8 @@ def validate_startup_config(config) -> None:
         raise RuntimeError("REQUIRE_JWT=1 requires JWT_SECRET to be set.")
     if config.REQUIRE_JWT and (config.JWT_ALGORITHM or "").strip().upper() != "HS256":
         raise RuntimeError("JWT_ALGORITHM must be HS256.")
+    if config.JWT_LEEWAY_SECONDS < 0:
+        raise RuntimeError("JWT_LEEWAY_SECONDS must be greater than or equal to 0.")
     if config.rate_limit_backend not in {"memory", "redis"}:
         raise RuntimeError("RATE_LIMIT_BACKEND must be one of: memory, redis.")
     if config.rate_limit_backend == "redis" and not (config.REDIS_URL or "").strip():
@@ -41,4 +43,3 @@ def validate_startup_config(config) -> None:
             raise RuntimeError("Strict security mode requires explicit CORS_ALLOW_ORIGINS (wildcard is not allowed).")
         if config.RATE_LIMIT_PER_MINUTE <= 0:
             raise RuntimeError("Strict security mode requires RATE_LIMIT_PER_MINUTE > 0.")
-

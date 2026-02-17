@@ -35,6 +35,7 @@
 - 서비스 DI override fixture 추가 (`tests/conftest.py`: `override_dependency`)
 - service/repository 포트 인터페이스 모듈 추가 (`app/ports/services.py`, `app/ports/repositories.py`)
 - 타입체크 스크립트/설정 추가 (`scripts/check_mypy.py`, `mypy.ini`)
+- JWT leeway 설정 추가 (`JWT_LEEWAY_SECONDS`)
 
 ### 변경됨
 
@@ -67,6 +68,7 @@
 - endpoint 테스트를 monkeypatch 기반에서 dependency override 기반으로 일원화
 - 서비스/리포지토리 Port Protocol 정의를 서비스 구현 파일에서 분리해 `app/ports/*`로 이동
 - CI 문서 계약 워크플로우에 phase-1 mypy 체크(경고 모드) 단계를 추가
+- JWT 검증을 수동 구현에서 `PyJWT` 기반 검증으로 전환하고 `sub`/`exp` 필수 정책을 적용
 
 ### 수정됨
 
