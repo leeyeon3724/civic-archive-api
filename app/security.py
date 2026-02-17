@@ -1,9 +1,6 @@
 from __future__ import annotations
 
-import base64
-import hashlib
 import hmac
-import json
 import logging
 import threading
 import time
@@ -11,6 +8,9 @@ from ipaddress import ip_address, ip_network
 from typing import Any, Callable
 
 from fastapi import Header, Request
+import jwt
+from jwt.exceptions import InvalidTokenError
+from jwt.types import Options
 
 from app.errors import http_error
 
@@ -165,19 +165,6 @@ return current
             return int(self._client.eval(self._WINDOW_SCRIPT, 1, redis_key, self.window_seconds))
 
 
-def _base64url_decode(value: str) -> bytes:
-    padding = "=" * ((4 - len(value) % 4) % 4)
-    return base64.urlsafe_b64decode((value + padding).encode("ascii"))
-
-
-def _json_from_b64url(value: str) -> dict:
-    decoded = _base64url_decode(value)
-    payload = json.loads(decoded.decode("utf-8"))
-    if not isinstance(payload, dict):
-        raise ValueError("jwt payload is not an object")
-    return payload
-
-
 def _extract_values_set(claims: dict, *keys: str) -> set[str]:
     values: set[str] = set()
     for key in keys:
@@ -206,61 +193,38 @@ def _required_scope_for_method(config, method: str) -> str | None:
 
 
 def _validate_jwt_hs256(token: str, config) -> dict:
-    parts = token.split(".")
-    if len(parts) != 3:
+    secret = (config.JWT_SECRET or "").strip()
+    if not secret:
         raise http_error(401, "UNAUTHORIZED", "Unauthorized")
 
-    header_b64, payload_b64, signature_b64 = parts
+    audience = (config.JWT_AUDIENCE or "").strip() or None
+    issuer = (config.JWT_ISSUER or "").strip() or None
+    leeway_seconds = max(0, int(config.JWT_LEEWAY_SECONDS))
+
+    options: Options = {
+        "require": ["sub", "exp"],
+        "verify_signature": True,
+        "verify_exp": True,
+        "verify_nbf": True,
+        "verify_aud": audience is not None,
+        "verify_iss": issuer is not None,
+    }
+
     try:
-        header = _json_from_b64url(header_b64)
-        payload = _json_from_b64url(payload_b64)
-        signature = _base64url_decode(signature_b64)
-    except Exception:
+        payload = jwt.decode(
+            token,
+            key=secret,
+            algorithms=["HS256"],
+            options=options,
+            audience=audience,
+            issuer=issuer,
+            leeway=leeway_seconds,
+        )
+    except (InvalidTokenError, TypeError, ValueError):
         raise http_error(401, "UNAUTHORIZED", "Unauthorized")
 
-    if str(header.get("alg") or "").upper() != "HS256":
+    if not isinstance(payload, dict):
         raise http_error(401, "UNAUTHORIZED", "Unauthorized")
-
-    secret = (config.JWT_SECRET or "").encode("utf-8")
-    signing_input = f"{header_b64}.{payload_b64}".encode("ascii")
-    expected_signature = hmac.new(secret, signing_input, hashlib.sha256).digest()
-    if not hmac.compare_digest(expected_signature, signature):
-        raise http_error(401, "UNAUTHORIZED", "Unauthorized")
-
-    now = int(time.time())
-
-    exp = payload.get("exp")
-    if exp is not None:
-        try:
-            if now >= int(exp):
-                raise http_error(401, "UNAUTHORIZED", "Unauthorized")
-        except (TypeError, ValueError):
-            raise http_error(401, "UNAUTHORIZED", "Unauthorized")
-
-    nbf = payload.get("nbf")
-    if nbf is not None:
-        try:
-            if now < int(nbf):
-                raise http_error(401, "UNAUTHORIZED", "Unauthorized")
-        except (TypeError, ValueError):
-            raise http_error(401, "UNAUTHORIZED", "Unauthorized")
-
-    audience = (config.JWT_AUDIENCE or "").strip()
-    if audience:
-        aud_claim = payload.get("aud")
-        if isinstance(aud_claim, str):
-            aud_values = {aud_claim}
-        elif isinstance(aud_claim, list):
-            aud_values = {str(v) for v in aud_claim}
-        else:
-            aud_values = set()
-        if audience not in aud_values:
-            raise http_error(401, "UNAUTHORIZED", "Unauthorized")
-
-    issuer = (config.JWT_ISSUER or "").strip()
-    if issuer and str(payload.get("iss") or "") != issuer:
-        raise http_error(401, "UNAUTHORIZED", "Unauthorized")
-
     return payload
 
 

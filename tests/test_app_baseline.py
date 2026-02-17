@@ -359,7 +359,7 @@ def test_api_key_required_for_protected_endpoint(make_engine):
 
 
 def test_jwt_required_for_protected_endpoint(make_engine):
-    secret = "jwt-test-secret"
+    secret = "jwt-test-secret-0123456789abcdef"
     now = int(time.time())
     write_token = _build_jwt(
         secret,
@@ -397,7 +397,7 @@ def test_jwt_required_for_protected_endpoint(make_engine):
 
 
 def test_jwt_forbidden_without_required_scope(make_engine):
-    secret = "jwt-scope-test-secret"
+    secret = "jwt-scope-test-secret-0123456789ab"
     now = int(time.time())
     read_only_token = _build_jwt(
         secret,
@@ -427,7 +427,7 @@ def test_jwt_forbidden_without_required_scope(make_engine):
 
 
 def test_jwt_admin_role_bypasses_scope_checks(make_engine):
-    secret = "jwt-admin-test-secret"
+    secret = "jwt-admin-test-secret-0123456789ab"
     now = int(time.time())
     admin_token = _build_jwt(
         secret,
@@ -455,6 +455,81 @@ def test_jwt_admin_role_bypasses_scope_checks(make_engine):
         assert response.status_code == 200
 
 
+def test_jwt_rejects_tokens_missing_required_sub_or_exp(make_engine):
+    secret = "jwt-required-claims-secret-012345"
+    now = int(time.time())
+    missing_sub = _build_jwt(
+        secret,
+        {
+            "scope": "archive:write",
+            "exp": now + 300,
+        },
+    )
+    missing_exp = _build_jwt(
+        secret,
+        {
+            "sub": "user-required-claims",
+            "scope": "archive:write",
+        },
+    )
+
+    with patch("app.database.create_engine", return_value=make_engine(lambda *_: StubResult())):
+        app = create_app(
+            Config(
+                REQUIRE_JWT=True,
+                JWT_SECRET=secret,
+            )
+        )
+
+    with TestClient(app) as tc:
+        sub_missing_response = tc.post(
+            "/api/echo",
+            json={"hello": "world"},
+            headers={"Authorization": f"Bearer {missing_sub}"},
+        )
+        assert sub_missing_response.status_code == 401
+        assert sub_missing_response.json()["code"] == "UNAUTHORIZED"
+
+        exp_missing_response = tc.post(
+            "/api/echo",
+            json={"hello": "world"},
+            headers={"Authorization": f"Bearer {missing_exp}"},
+        )
+        assert exp_missing_response.status_code == 401
+        assert exp_missing_response.json()["code"] == "UNAUTHORIZED"
+
+
+def test_jwt_leeway_allows_slightly_expired_token(make_engine):
+    secret = "jwt-leeway-secret-0123456789abcdef"
+    now = int(time.time())
+    write_token = _build_jwt(
+        secret,
+        {
+            "sub": "user-leeway",
+            "scope": "archive:write",
+            "exp": now - 1,
+        },
+    )
+
+    with patch("app.database.create_engine", return_value=make_engine(lambda *_: StubResult())):
+        app = create_app(
+            Config(
+                REQUIRE_JWT=True,
+                JWT_SECRET=secret,
+                JWT_LEEWAY_SECONDS=5,
+            )
+        )
+
+    with TestClient(app) as tc:
+        response = tc.post(
+            "/api/echo",
+            json={"hello": "world"},
+            headers={"Authorization": f"Bearer {write_token}"},
+        )
+        assert response.status_code == 200
+        assert response.json() == {"you_sent": {"hello": "world"}}
+
+
 def test_jwt_configuration_requires_secret(make_engine):
     with patch("app.database.create_engine", return_value=make_engine(lambda *_: StubResult())):
         with pytest.raises(RuntimeError):
@@ -472,8 +547,20 @@ def test_jwt_algorithm_must_be_hs256(make_engine):
             create_app(
                 Config(
                     REQUIRE_JWT=True,
-                    JWT_SECRET="test-secret",
+                    JWT_SECRET="test-secret-0123456789abcdefghijkl",
                     JWT_ALGORITHM="RS256",
+                )
+            )
+
+
+def test_jwt_leeway_must_be_non_negative(make_engine):
+    with patch("app.database.create_engine", return_value=make_engine(lambda *_: StubResult())):
+        with pytest.raises(RuntimeError, match="JWT_LEEWAY_SECONDS must be greater than or equal to 0."):
+            create_app(
+                Config(
+                    REQUIRE_JWT=True,
+                    JWT_SECRET="test-secret-0123456789abcdefghijkl",
+                    JWT_LEEWAY_SECONDS=-1,
                 )
             )
 
