@@ -34,6 +34,8 @@
 - 인증이 활성화된 경우(`REQUIRE_API_KEY=1`) `/api/*` 요청에 `X-API-Key` 헤더 필수
 - JWT 인증이 활성화된 경우(`REQUIRE_JWT=1`) `/api/*` 요청에 `Authorization: Bearer <token>` 헤더 필수
   - `JWT_ALGORITHM`: 현재 `HS256`만 지원
+  - 필수 클레임: `sub`, `exp`
+  - 시간 기반 클레임 검증 허용 오차: `JWT_LEEWAY_SECONDS`
   - `JWT_AUDIENCE`/`JWT_ISSUER` 설정 시 `aud`/`iss` 클레임 검증
   - 메서드별 scope 정책: `JWT_SCOPE_READ`, `JWT_SCOPE_WRITE`, `JWT_SCOPE_DELETE`
   - `JWT_ADMIN_ROLE` role 보유 시 scope 검사 우회

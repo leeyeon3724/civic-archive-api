@@ -58,6 +58,7 @@ Copy-Item .env.example .env
 | `REQUIRE_JWT` | `0` | `1`이면 `/api/*` 엔드포인트에 `Authorization: Bearer <JWT>` 필수 |
 | `JWT_SECRET` | `` | JWT HMAC secret (`REQUIRE_JWT=1`일 때 필수) |
 | `JWT_ALGORITHM` | `HS256` | 현재 `HS256`만 지원 |
+| `JWT_LEEWAY_SECONDS` | `0` | JWT 시간 기반 클레임(`exp`/`nbf`) 허용 오차(초) |
 | `JWT_AUDIENCE` | `` | 지정 시 `aud` 클레임 검증 |
 | `JWT_ISSUER` | `` | 지정 시 `iss` 클레임 검증 |
 | `JWT_SCOPE_READ` | `archive:read` | 읽기( GET/HEAD ) 권한 scope |
@@ -88,6 +89,7 @@ Copy-Item .env.example .env
 - 기본값(`REQUIRE_API_KEY=0`)은 로컬 개발 편의를 위한 설정입니다.
 - 운영 환경에서는 `REQUIRE_API_KEY=1`, `API_KEY=<secret>` 적용을 권장합니다.
 - 운영 환경에서는 `REQUIRE_JWT=1`과 scope/role 정책 적용을 권장합니다.
+- JWT 검증 시 `sub`, `exp` 클레임은 필수입니다(`JWT_LEEWAY_SECONDS`로 시간 오차 허용 가능).
 - `SECURITY_STRICT_MODE=1` 또는 `APP_ENV=production`이면 아래 항목이 강제됩니다.
   - 인증 필수 (`REQUIRE_API_KEY=1` 또는 `REQUIRE_JWT=1`)
   - `ALLOWED_HOSTS` wildcard 금지
