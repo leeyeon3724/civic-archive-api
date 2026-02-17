@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast as typing_cast
 
 from sqlalchemy import Date, bindparam, cast, column, func, select, table, text
 
+from app.ports.dto import NewsArticleRecordDTO, NewsArticleUpsertDTO
 from app.repositories.common import dedupe_rows_by_key, execute_filtered_paginated_query, to_json_recordset
 from app.repositories.search import build_split_search_condition, build_split_search_params
 from app.repositories.session_provider import ConnectionProvider, open_connection_scope
@@ -25,7 +26,7 @@ NEWS_ARTICLES = table(
 
 
 def upsert_articles(
-    articles: list[dict[str, Any]],
+    articles: list[NewsArticleUpsertDTO],
     *,
     connection_provider: ConnectionProvider,
 ) -> tuple[int, int]:
@@ -102,7 +103,7 @@ def list_articles(
     page: int,
     size: int,
     connection_provider: ConnectionProvider,
-) -> tuple[list[dict[str, Any]], int]:
+) -> tuple[list[NewsArticleRecordDTO], int]:
     conditions = []
     params: dict[str, Any] = {}
 
@@ -156,7 +157,7 @@ def list_articles(
 
     count_stmt = select(func.count().label("total")).select_from(NEWS_ARTICLES)
 
-    return execute_filtered_paginated_query(
+    rows, total = execute_filtered_paginated_query(
         list_stmt=list_stmt,
         count_stmt=count_stmt,
         conditions=conditions,
@@ -165,13 +166,14 @@ def list_articles(
         size=size,
         connection_provider=connection_provider,
     )
+    return typing_cast(list[NewsArticleRecordDTO], rows), total
 
 
 def get_article(
     item_id: int,
     *,
     connection_provider: ConnectionProvider,
-) -> dict[str, Any] | None:
+) -> NewsArticleRecordDTO | None:
     sql = text(
         "SELECT id, source, title, url, published_at, author, summary, content, keywords, created_at, updated_at "
         "FROM news_articles WHERE id=:id"
@@ -180,7 +182,7 @@ def get_article(
     with open_connection_scope(connection_provider) as conn:
         row = conn.execute(sql, {"id": item_id}).mappings().first()
 
-    return dict(row) if row else None
+    return typing_cast(NewsArticleRecordDTO, dict(row)) if row else None
 
 
 def delete_article(
@@ -198,7 +200,7 @@ class NewsRepository:
     def __init__(self, *, connection_provider: ConnectionProvider) -> None:
         self._connection_provider = connection_provider
 
-    def upsert_articles(self, articles: list[dict[str, Any]]) -> tuple[int, int]:
+    def upsert_articles(self, articles: list[NewsArticleUpsertDTO]) -> tuple[int, int]:
         return upsert_articles(articles, connection_provider=self._connection_provider)
 
     def list_articles(
@@ -210,7 +212,7 @@ class NewsRepository:
         date_to: str | None,
         page: int,
         size: int,
-    ) -> tuple[list[dict[str, Any]], int]:
+    ) -> tuple[list[NewsArticleRecordDTO], int]:
         return list_articles(
             q=q,
             source=source,
@@ -221,7 +223,7 @@ class NewsRepository:
             connection_provider=self._connection_provider,
         )
 
-    def get_article(self, item_id: int) -> dict[str, Any] | None:
+    def get_article(self, item_id: int) -> NewsArticleRecordDTO | None:
         return get_article(item_id, connection_provider=self._connection_provider)
 
     def delete_article(self, item_id: int) -> bool:

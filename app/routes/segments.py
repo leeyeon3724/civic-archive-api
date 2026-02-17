@@ -1,9 +1,9 @@
 from datetime import date
-from typing import Any
 
 from fastapi import APIRouter, Body, Depends, Query, Request
 
 from app.errors import http_error
+from app.ports.dto import SegmentUpsertDTO
 from app.ports.services import SegmentsServicePort
 from app.routes.common import ERROR_RESPONSES, enforce_ingest_batch_limit
 from app.schemas import (
@@ -46,7 +46,7 @@ def save_segments(
 ) -> InsertResponse:
     payload_items = payload if isinstance(payload, list) else [payload]
     enforce_ingest_batch_limit(request, len(payload_items))
-    items: list[dict[str, Any]] = [service.normalize_segment(item.model_dump()) for item in payload_items]
+    items: list[SegmentUpsertDTO] = [service.normalize_segment(item.model_dump()) for item in payload_items]
     inserted = service.insert_segments(items)
     return InsertResponse(inserted=inserted)
 
@@ -89,7 +89,12 @@ def list_segments(
         size=size,
     )
 
-    return SegmentsListResponse(page=page, size=size, total=total, items=[SegmentsItemBase(**row) for row in rows])
+    return SegmentsListResponse(
+        page=page,
+        size=size,
+        total=total,
+        items=[SegmentsItemBase.model_validate(row) for row in rows],
+    )
 
 
 @router.get(
@@ -102,7 +107,7 @@ def get_segment(item_id: int, service: SegmentsServicePort = Depends(get_segment
     row = service.get_segment(item_id)
     if not row:
         raise http_error(404, "NOT_FOUND", "Not Found")
-    return SegmentsItemDetail(**row)
+    return SegmentsItemDetail.model_validate(row)
 
 
 @router.delete(

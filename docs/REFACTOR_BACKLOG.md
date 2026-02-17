@@ -468,10 +468,10 @@
 ### Ticket P2-2: Parsing/Domain Contract Unification
 
 - Priority: P2
-- Status: In Progress
+- Status: Completed
 - Tasks:
   - [x] unify duplicated date/datetime parsing policy across `schemas` and `utils`
-  - introduce typed DTO boundaries for service/repository ports incrementally
+  - [x] introduce typed DTO boundaries for service/repository ports incrementally
   - [x] align error messages and validation semantics across layers
 - Done Criteria:
   - single parsing policy implementation is reused across layers

@@ -3,8 +3,9 @@ from __future__ import annotations
 import hashlib
 import json
 from datetime import date, datetime
-from typing import Any, cast
+from typing import Mapping, cast
 
+from app.ports.dto import SegmentRecordDTO, SegmentUpsertDTO
 from app.ports.repositories import SegmentsRepositoryPort
 from app.ports.services import SegmentsServicePort
 from app.repositories.segments_repository import SegmentsRepository
@@ -12,19 +13,34 @@ from app.repositories.session_provider import ConnectionProvider, ensure_connect
 from app.utils import bad_request, coerce_meeting_no_int, combine_meeting_no, parse_date
 
 
-def _canonical_json_value(value: Any) -> Any:
+def _optional_str(value: object) -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        return None
+    stripped = value.strip()
+    return stripped or None
+
+
+def _as_date_input(value: object) -> str | datetime | date | None:
+    if value is None or isinstance(value, (str, datetime, date)):
+        return value
+    raise bad_request(f"meeting_date format error (YYYY-MM-DD): {value}")
+
+
+def _canonical_json_value(value: object) -> object:
     if isinstance(value, datetime):
         return value.isoformat()
     if isinstance(value, date):
         return value.isoformat()
     if isinstance(value, list):
         return [_canonical_json_value(item) for item in value]
-    if isinstance(value, dict):
-        return {str(key): _canonical_json_value(value[key]) for key in sorted(value)}
+    if isinstance(value, Mapping):
+        return {str(key): _canonical_json_value(value[key]) for key in sorted(value, key=str)}
     return value
 
 
-def _build_segment_dedupe_hash(item: dict[str, Any]) -> str:
+def _build_segment_dedupe_hash(item: Mapping[str, object]) -> str:
     canonical_payload = _canonical_json_value(
         {
             "council": item.get("council"),
@@ -50,52 +66,63 @@ def _build_segment_dedupe_hash(item: dict[str, Any]) -> str:
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
 
 
-def _normalize_segment(item: dict[str, Any]) -> dict[str, Any]:
+def _normalize_segment(item: dict[str, object]) -> SegmentUpsertDTO:
     if not isinstance(item, dict):
         raise bad_request("Each item must be a JSON object.")
 
     council = item.get("council")
-    if not council:
+    if not isinstance(council, str) or not council.strip():
         raise bad_request("Missing required field: council")
 
-    session = item.get("session")
+    session = _optional_str(item.get("session"))
     meeting_no_raw = item.get("meeting_no")
     meeting_no_int = coerce_meeting_no_int(meeting_no_raw)
 
-    meeting_date = parse_date(item.get("meeting_date"))
+    meeting_date = parse_date(_as_date_input(item.get("meeting_date")))
 
-    normalized = {
-        "council": council,
-        "committee": item.get("committee"),
+    normalized: SegmentUpsertDTO = {
+        "council": council.strip(),
+        "committee": _optional_str(item.get("committee")),
         "session": session,
         "meeting_no": meeting_no_int,
         "meeting_no_combined": combine_meeting_no(session, meeting_no_raw, meeting_no_int),
         "meeting_date": meeting_date.date() if meeting_date else None,
-        "content": item.get("content"),
-        "summary": item.get("summary"),
-        "subject": item.get("subject"),
+        "content": _optional_str(item.get("content")),
+        "summary": _optional_str(item.get("summary")),
+        "subject": _optional_str(item.get("subject")),
         "tag": item.get("tag"),
         "importance": parse_importance_value(item.get("importance"), required=False),
         "moderator": item.get("moderator"),
         "questioner": item.get("questioner"),
         "answerer": item.get("answerer"),
-        "party": item.get("party"),
-        "constituency": item.get("constituency"),
-        "department": item.get("department"),
+        "party": _optional_str(item.get("party")),
+        "constituency": _optional_str(item.get("constituency")),
+        "department": _optional_str(item.get("department")),
+        "dedupe_hash": "",
     }
     normalized["dedupe_hash"] = _build_segment_dedupe_hash(normalized)
     return normalized
 
 
-def parse_importance_value(raw: Any, *, required: bool) -> int | None:
+def parse_importance_value(raw: object, *, required: bool) -> int | None:
     if raw is None:
         if required:
             raise bad_request("importance must be one of 1, 2, 3.")
         return None
 
-    try:
-        value = int(raw)
-    except (TypeError, ValueError):
+    if isinstance(raw, bool):
+        raise bad_request("importance must be an integer (1, 2, 3).")
+    if isinstance(raw, int):
+        value = raw
+    elif isinstance(raw, str):
+        stripped = raw.strip()
+        if not stripped:
+            raise bad_request("importance must be an integer (1, 2, 3).")
+        try:
+            value = int(stripped)
+        except ValueError:
+            raise bad_request("importance must be an integer (1, 2, 3).")
+    else:
         raise bad_request("importance must be an integer (1, 2, 3).")
 
     if value not in (1, 2, 3):
@@ -121,10 +148,10 @@ class SegmentsService:
         self._repository = repository
 
     @staticmethod
-    def normalize_segment(item: dict[str, Any]) -> dict[str, Any]:
+    def normalize_segment(item: dict[str, object]) -> SegmentUpsertDTO:
         return _normalize_segment(item)
 
-    def insert_segments(self, items: list[dict[str, Any]]) -> int:
+    def insert_segments(self, items: list[SegmentUpsertDTO]) -> int:
         return self._repository.insert_segments(items)
 
     def list_segments(
@@ -143,7 +170,7 @@ class SegmentsService:
         date_to: str | None,
         page: int,
         size: int,
-    ) -> tuple[list[dict[str, Any]], int]:
+    ) -> tuple[list[SegmentRecordDTO], int]:
         return self._repository.list_segments(
             q=q,
             council=council,
@@ -160,7 +187,7 @@ class SegmentsService:
             size=size,
         )
 
-    def get_segment(self, item_id: int) -> dict[str, Any] | None:
+    def get_segment(self, item_id: int) -> SegmentRecordDTO | None:
         return self._repository.get_segment(item_id)
 
     def delete_segment(self, item_id: int) -> bool:
@@ -176,12 +203,12 @@ def build_segments_service(
     return cast(SegmentsServicePort, cast(object, SegmentsService(repository=selected_repository)))
 
 
-def normalize_segment(item: dict[str, Any]) -> dict[str, Any]:
+def normalize_segment(item: dict[str, object]) -> SegmentUpsertDTO:
     return _normalize_segment(item)
 
 
 def insert_segments(
-    items: list[dict[str, Any]],
+    items: list[SegmentUpsertDTO],
     *,
     service: SegmentsServicePort | None = None,
     connection_provider: ConnectionProvider | None = None,
@@ -207,7 +234,7 @@ def list_segments(
     size: int,
     service: SegmentsServicePort | None = None,
     connection_provider: ConnectionProvider | None = None,
-) -> tuple[list[dict[str, Any]], int]:
+) -> tuple[list[SegmentRecordDTO], int]:
     active_service = service or build_segments_service(connection_provider=ensure_connection_provider(connection_provider))
     return active_service.list_segments(
         q=q,
@@ -231,7 +258,7 @@ def get_segment(
     *,
     service: SegmentsServicePort | None = None,
     connection_provider: ConnectionProvider | None = None,
-) -> dict[str, Any] | None:
+) -> SegmentRecordDTO | None:
     active_service = service or build_segments_service(connection_provider=ensure_connection_provider(connection_provider))
     return active_service.get_segment(item_id)
 

@@ -1,10 +1,19 @@
 from __future__ import annotations
 
-from typing import Any, Protocol
+from typing import Protocol
+
+from app.ports.dto import (
+    MinutesRecordDTO,
+    MinutesUpsertDTO,
+    NewsArticleRecordDTO,
+    NewsArticleUpsertDTO,
+    SegmentRecordDTO,
+    SegmentUpsertDTO,
+)
 
 
 class NewsRepositoryPort(Protocol):
-    def upsert_articles(self, articles: list[dict[str, Any]]) -> tuple[int, int]:
+    def upsert_articles(self, articles: list[NewsArticleUpsertDTO]) -> tuple[int, int]:
         ...
 
     def list_articles(
@@ -16,10 +25,10 @@ class NewsRepositoryPort(Protocol):
         date_to: str | None,
         page: int,
         size: int,
-    ) -> tuple[list[dict[str, Any]], int]:
+    ) -> tuple[list[NewsArticleRecordDTO], int]:
         ...
 
-    def get_article(self, item_id: int) -> dict[str, Any] | None:
+    def get_article(self, item_id: int) -> NewsArticleRecordDTO | None:
         ...
 
     def delete_article(self, item_id: int) -> bool:
@@ -27,7 +36,7 @@ class NewsRepositoryPort(Protocol):
 
 
 class MinutesRepositoryPort(Protocol):
-    def upsert_minutes(self, items: list[dict[str, Any]]) -> tuple[int, int]:
+    def upsert_minutes(self, items: list[MinutesUpsertDTO]) -> tuple[int, int]:
         ...
 
     def list_minutes(
@@ -42,10 +51,10 @@ class MinutesRepositoryPort(Protocol):
         date_to: str | None,
         page: int,
         size: int,
-    ) -> tuple[list[dict[str, Any]], int]:
+    ) -> tuple[list[MinutesRecordDTO], int]:
         ...
 
-    def get_minutes(self, item_id: int) -> dict[str, Any] | None:
+    def get_minutes(self, item_id: int) -> MinutesRecordDTO | None:
         ...
 
     def delete_minutes(self, item_id: int) -> bool:
@@ -53,7 +62,7 @@ class MinutesRepositoryPort(Protocol):
 
 
 class SegmentsRepositoryPort(Protocol):
-    def insert_segments(self, items: list[dict[str, Any]]) -> int:
+    def insert_segments(self, items: list[SegmentUpsertDTO]) -> int:
         ...
 
     def list_segments(
@@ -72,10 +81,10 @@ class SegmentsRepositoryPort(Protocol):
         date_to: str | None,
         page: int,
         size: int,
-    ) -> tuple[list[dict[str, Any]], int]:
+    ) -> tuple[list[SegmentRecordDTO], int]:
         ...
 
-    def get_segment(self, item_id: int) -> dict[str, Any] | None:
+    def get_segment(self, item_id: int) -> SegmentRecordDTO | None:
         ...
 
     def delete_segment(self, item_id: int) -> bool:

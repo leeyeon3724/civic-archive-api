@@ -1,9 +1,9 @@
 from datetime import date
-from typing import Any
 
 from fastapi import APIRouter, Body, Depends, Query, Request
 
 from app.errors import http_error
+from app.ports.dto import MinutesUpsertDTO
 from app.ports.services import MinutesServicePort
 from app.routes.common import ERROR_RESPONSES, enforce_ingest_batch_limit
 from app.schemas import (
@@ -45,7 +45,7 @@ def save_minutes(
 ) -> UpsertResponse:
     payload_items = payload if isinstance(payload, list) else [payload]
     enforce_ingest_batch_limit(request, len(payload_items))
-    items: list[dict[str, Any]] = [service.normalize_minutes(item.model_dump()) for item in payload_items]
+    items: list[MinutesUpsertDTO] = [service.normalize_minutes(item.model_dump()) for item in payload_items]
     inserted, updated = service.upsert_minutes(items)
     return UpsertResponse(inserted=inserted, updated=updated)
 
@@ -80,7 +80,12 @@ def list_minutes(
         size=size,
     )
 
-    return MinutesListResponse(page=page, size=size, total=total, items=[MinutesItemBase(**row) for row in rows])
+    return MinutesListResponse(
+        page=page,
+        size=size,
+        total=total,
+        items=[MinutesItemBase.model_validate(row) for row in rows],
+    )
 
 
 @router.get(
@@ -93,7 +98,7 @@ def get_minutes(item_id: int, service: MinutesServicePort = Depends(get_minutes_
     row = service.get_minutes(item_id)
     if not row:
         raise http_error(404, "NOT_FOUND", "Not Found")
-    return MinutesItemDetail(**row)
+    return MinutesItemDetail.model_validate(row)
 
 
 @router.delete(

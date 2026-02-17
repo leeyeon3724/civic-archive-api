@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast as typing_cast
 
 from sqlalchemy import bindparam, column, func, select, table, text
 
+from app.ports.dto import SegmentRecordDTO, SegmentUpsertDTO
 from app.repositories.common import (
     add_not_none_equals_filter,
     add_truthy_equals_filter,
@@ -40,7 +41,7 @@ COUNCIL_SPEECH_SEGMENTS = table(
 
 
 def insert_segments(
-    items: list[dict[str, Any]],
+    items: list[SegmentUpsertDTO],
     *,
     connection_provider: ConnectionProvider,
 ) -> int:
@@ -152,7 +153,7 @@ def list_segments(
     page: int,
     size: int,
     connection_provider: ConnectionProvider,
-) -> tuple[list[dict[str, Any]], int]:
+) -> tuple[list[SegmentRecordDTO], int]:
     conditions = []
     params: dict[str, Any] = {}
 
@@ -239,7 +240,7 @@ def list_segments(
 
     count_stmt = select(func.count().label("total")).select_from(COUNCIL_SPEECH_SEGMENTS)
 
-    return execute_filtered_paginated_query(
+    rows, total = execute_filtered_paginated_query(
         list_stmt=list_stmt,
         count_stmt=count_stmt,
         conditions=conditions,
@@ -248,13 +249,14 @@ def list_segments(
         size=size,
         connection_provider=connection_provider,
     )
+    return typing_cast(list[SegmentRecordDTO], rows), total
 
 
 def get_segment(
     item_id: int,
     *,
     connection_provider: ConnectionProvider,
-) -> dict[str, Any] | None:
+) -> SegmentRecordDTO | None:
     sql = text(
         """
         SELECT id, council, committee, "session",
@@ -271,7 +273,7 @@ def get_segment(
     with open_connection_scope(connection_provider) as conn:
         row = conn.execute(sql, {"id": item_id}).mappings().first()
 
-    return dict(row) if row else None
+    return typing_cast(SegmentRecordDTO, dict(row)) if row else None
 
 
 def delete_segment(
@@ -289,7 +291,7 @@ class SegmentsRepository:
     def __init__(self, *, connection_provider: ConnectionProvider) -> None:
         self._connection_provider = connection_provider
 
-    def insert_segments(self, items: list[dict[str, Any]]) -> int:
+    def insert_segments(self, items: list[SegmentUpsertDTO]) -> int:
         return insert_segments(items, connection_provider=self._connection_provider)
 
     def list_segments(
@@ -308,7 +310,7 @@ class SegmentsRepository:
         date_to: str | None,
         page: int,
         size: int,
-    ) -> tuple[list[dict[str, Any]], int]:
+    ) -> tuple[list[SegmentRecordDTO], int]:
         return list_segments(
             q=q,
             council=council,
@@ -326,7 +328,7 @@ class SegmentsRepository:
             connection_provider=self._connection_provider,
         )
 
-    def get_segment(self, item_id: int) -> dict[str, Any] | None:
+    def get_segment(self, item_id: int) -> SegmentRecordDTO | None:
         return get_segment(item_id, connection_provider=self._connection_provider)
 
     def delete_segment(self, item_id: int) -> bool:

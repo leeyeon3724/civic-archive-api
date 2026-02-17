@@ -1,7 +1,9 @@
 from __future__ import annotations
 
-from typing import Any, cast
+from datetime import date, datetime
+from typing import cast
 
+from app.ports.dto import MinutesRecordDTO, MinutesUpsertDTO
 from app.ports.repositories import MinutesRepositoryPort
 from app.ports.services import MinutesServicePort
 from app.repositories.minutes_repository import MinutesRepository
@@ -9,30 +11,45 @@ from app.repositories.session_provider import ConnectionProvider, ensure_connect
 from app.utils import bad_request, coerce_meeting_no_int, combine_meeting_no, parse_date
 
 
-def _normalize_minutes(item: dict[str, Any]) -> dict[str, Any]:
+def _optional_str(value: object) -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        return None
+    stripped = value.strip()
+    return stripped or None
+
+
+def _as_date_input(value: object) -> str | datetime | date | None:
+    if value is None or isinstance(value, (str, datetime, date)):
+        return value
+    raise bad_request(f"meeting_date format error (YYYY-MM-DD): {value}")
+
+
+def _normalize_minutes(item: dict[str, object]) -> MinutesUpsertDTO:
     if not isinstance(item, dict):
         raise bad_request("Each item must be a JSON object.")
 
     council = item.get("council")
     url = item.get("url")
-    if not council or not url:
+    if not isinstance(council, str) or not council.strip() or not isinstance(url, str) or not url.strip():
         raise bad_request("Missing required fields: council, url")
 
-    session = item.get("session")
+    session = _optional_str(item.get("session"))
     meeting_no_raw = item.get("meeting_no")
     meeting_no_int = coerce_meeting_no_int(meeting_no_raw)
 
-    meeting_date = parse_date(item.get("meeting_date"))
+    meeting_date = parse_date(_as_date_input(item.get("meeting_date")))
 
     return {
-        "council": council,
-        "committee": item.get("committee"),
+        "council": council.strip(),
+        "committee": _optional_str(item.get("committee")),
         "session": session,
         "meeting_no": meeting_no_int,
         "meeting_no_combined": combine_meeting_no(session, meeting_no_raw, meeting_no_int),
-        "url": url,
+        "url": url.strip(),
         "meeting_date": meeting_date.date() if meeting_date else None,
-        "content": item.get("content"),
+        "content": _optional_str(item.get("content")),
         "tag": item.get("tag"),
         "attendee": item.get("attendee"),
         "agenda": item.get("agenda"),
@@ -44,10 +61,10 @@ class MinutesService:
         self._repository = repository
 
     @staticmethod
-    def normalize_minutes(item: dict[str, Any]) -> dict[str, Any]:
+    def normalize_minutes(item: dict[str, object]) -> MinutesUpsertDTO:
         return _normalize_minutes(item)
 
-    def upsert_minutes(self, items: list[dict[str, Any]]) -> tuple[int, int]:
+    def upsert_minutes(self, items: list[MinutesUpsertDTO]) -> tuple[int, int]:
         return self._repository.upsert_minutes(items)
 
     def list_minutes(
@@ -62,7 +79,7 @@ class MinutesService:
         date_to: str | None,
         page: int,
         size: int,
-    ) -> tuple[list[dict[str, Any]], int]:
+    ) -> tuple[list[MinutesRecordDTO], int]:
         return self._repository.list_minutes(
             q=q,
             council=council,
@@ -75,7 +92,7 @@ class MinutesService:
             size=size,
         )
 
-    def get_minutes(self, item_id: int) -> dict[str, Any] | None:
+    def get_minutes(self, item_id: int) -> MinutesRecordDTO | None:
         return self._repository.get_minutes(item_id)
 
     def delete_minutes(self, item_id: int) -> bool:
@@ -91,12 +108,12 @@ def build_minutes_service(
     return cast(MinutesServicePort, cast(object, MinutesService(repository=selected_repository)))
 
 
-def normalize_minutes(item: dict[str, Any]) -> dict[str, Any]:
+def normalize_minutes(item: dict[str, object]) -> MinutesUpsertDTO:
     return _normalize_minutes(item)
 
 
 def upsert_minutes(
-    items: list[dict[str, Any]],
+    items: list[MinutesUpsertDTO],
     *,
     service: MinutesServicePort | None = None,
     connection_provider: ConnectionProvider | None = None,
@@ -118,7 +135,7 @@ def list_minutes(
     size: int,
     service: MinutesServicePort | None = None,
     connection_provider: ConnectionProvider | None = None,
-) -> tuple[list[dict[str, Any]], int]:
+) -> tuple[list[MinutesRecordDTO], int]:
     active_service = service or build_minutes_service(connection_provider=ensure_connection_provider(connection_provider))
     return active_service.list_minutes(
         q=q,
@@ -138,7 +155,7 @@ def get_minutes(
     *,
     service: MinutesServicePort | None = None,
     connection_provider: ConnectionProvider | None = None,
-) -> dict[str, Any] | None:
+) -> MinutesRecordDTO | None:
     active_service = service or build_minutes_service(connection_provider=ensure_connection_provider(connection_provider))
     return active_service.get_minutes(item_id)
 

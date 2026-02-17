@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast as typing_cast
 
 from sqlalchemy import bindparam, column, func, select, table, text
 
+from app.ports.dto import MinutesRecordDTO, MinutesUpsertDTO
 from app.repositories.common import (
     add_truthy_equals_filter,
     dedupe_rows_by_key,
@@ -33,7 +34,7 @@ COUNCIL_MINUTES = table(
 
 
 def upsert_minutes(
-    items: list[dict[str, Any]],
+    items: list[MinutesUpsertDTO],
     *,
     connection_provider: ConnectionProvider,
 ) -> tuple[int, int]:
@@ -132,7 +133,7 @@ def list_minutes(
     page: int,
     size: int,
     connection_provider: ConnectionProvider,
-) -> tuple[list[dict[str, Any]], int]:
+) -> tuple[list[MinutesRecordDTO], int]:
     conditions = []
     params: dict[str, Any] = {}
 
@@ -197,7 +198,7 @@ def list_minutes(
 
     count_stmt = select(func.count().label("total")).select_from(COUNCIL_MINUTES)
 
-    return execute_filtered_paginated_query(
+    rows, total = execute_filtered_paginated_query(
         list_stmt=list_stmt,
         count_stmt=count_stmt,
         conditions=conditions,
@@ -206,13 +207,14 @@ def list_minutes(
         size=size,
         connection_provider=connection_provider,
     )
+    return typing_cast(list[MinutesRecordDTO], rows), total
 
 
 def get_minutes(
     item_id: int,
     *,
     connection_provider: ConnectionProvider,
-) -> dict[str, Any] | None:
+) -> MinutesRecordDTO | None:
     sql = text(
         """
         SELECT id, council, committee, "session", meeting_no_combined AS meeting_no,
@@ -225,7 +227,7 @@ def get_minutes(
     with open_connection_scope(connection_provider) as conn:
         row = conn.execute(sql, {"id": item_id}).mappings().first()
 
-    return dict(row) if row else None
+    return typing_cast(MinutesRecordDTO, dict(row)) if row else None
 
 
 def delete_minutes(
@@ -243,7 +245,7 @@ class MinutesRepository:
     def __init__(self, *, connection_provider: ConnectionProvider) -> None:
         self._connection_provider = connection_provider
 
-    def upsert_minutes(self, items: list[dict[str, Any]]) -> tuple[int, int]:
+    def upsert_minutes(self, items: list[MinutesUpsertDTO]) -> tuple[int, int]:
         return upsert_minutes(items, connection_provider=self._connection_provider)
 
     def list_minutes(
@@ -258,7 +260,7 @@ class MinutesRepository:
         date_to: str | None,
         page: int,
         size: int,
-    ) -> tuple[list[dict[str, Any]], int]:
+    ) -> tuple[list[MinutesRecordDTO], int]:
         return list_minutes(
             q=q,
             council=council,
@@ -272,7 +274,7 @@ class MinutesRepository:
             connection_provider=self._connection_provider,
         )
 
-    def get_minutes(self, item_id: int) -> dict[str, Any] | None:
+    def get_minutes(self, item_id: int) -> MinutesRecordDTO | None:
         return get_minutes(item_id, connection_provider=self._connection_provider)
 
     def delete_minutes(self, item_id: int) -> bool:

@@ -1,9 +1,9 @@
 from datetime import date
-from typing import Any
 
 from fastapi import APIRouter, Body, Depends, Query, Request
 
 from app.errors import http_error
+from app.ports.dto import NewsArticleUpsertDTO
 from app.ports.services import NewsServicePort
 from app.routes.common import ERROR_RESPONSES, enforce_ingest_batch_limit
 from app.schemas import (
@@ -55,7 +55,7 @@ def save_news(
 ) -> UpsertResponse:
     payload_items = payload if isinstance(payload, list) else [payload]
     enforce_ingest_batch_limit(request, len(payload_items))
-    items: list[dict[str, Any]] = [service.normalize_article(item.model_dump()) for item in payload_items]
+    items: list[NewsArticleUpsertDTO] = [service.normalize_article(item.model_dump()) for item in payload_items]
     inserted, updated = service.upsert_articles(items)
     return UpsertResponse(inserted=inserted, updated=updated)
 
@@ -84,7 +84,7 @@ def list_news(
         size=size,
     )
 
-    return NewsListResponse(page=page, size=size, total=total, items=[NewsItemBase(**row) for row in rows])
+    return NewsListResponse(page=page, size=size, total=total, items=[NewsItemBase.model_validate(row) for row in rows])
 
 
 @router.get(
@@ -97,7 +97,7 @@ def get_news(item_id: int, service: NewsServicePort = Depends(get_news_service))
     row = service.get_article(item_id)
     if not row:
         raise http_error(404, "NOT_FOUND", "Not Found")
-    return NewsItemDetail(**row)
+    return NewsItemDetail.model_validate(row)
 
 
 @router.delete(
