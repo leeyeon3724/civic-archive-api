@@ -61,6 +61,18 @@ def create_app(config=None):
         raise RuntimeError("RATE_LIMIT_BACKEND=redis requires REDIS_URL to be set.")
     if config.RATE_LIMIT_REDIS_FAILURE_COOLDOWN_SECONDS <= 0:
         raise RuntimeError("RATE_LIMIT_REDIS_FAILURE_COOLDOWN_SECONDS must be greater than 0.")
+    if config.DB_POOL_SIZE <= 0:
+        raise RuntimeError("DB_POOL_SIZE must be greater than 0.")
+    if config.DB_MAX_OVERFLOW < 0:
+        raise RuntimeError("DB_MAX_OVERFLOW must be greater than or equal to 0.")
+    if config.DB_POOL_TIMEOUT_SECONDS <= 0:
+        raise RuntimeError("DB_POOL_TIMEOUT_SECONDS must be greater than 0.")
+    if config.DB_POOL_RECYCLE_SECONDS <= 0:
+        raise RuntimeError("DB_POOL_RECYCLE_SECONDS must be greater than 0.")
+    if config.DB_CONNECT_TIMEOUT_SECONDS <= 0:
+        raise RuntimeError("DB_CONNECT_TIMEOUT_SECONDS must be greater than 0.")
+    if config.DB_STATEMENT_TIMEOUT_MS <= 0:
+        raise RuntimeError("DB_STATEMENT_TIMEOUT_MS must be greater than 0.")
     if config.strict_security_mode:
         if not (config.REQUIRE_API_KEY or config.REQUIRE_JWT):
             raise RuntimeError("Strict security mode requires REQUIRE_API_KEY=1 or REQUIRE_JWT=1.")
@@ -79,7 +91,15 @@ def create_app(config=None):
     )
     api.add_middleware(TrustedHostMiddleware, allowed_hosts=config.allowed_hosts_list)
 
-    init_db(config.DATABASE_URL)
+    init_db(
+        config.DATABASE_URL,
+        pool_size=config.DB_POOL_SIZE,
+        max_overflow=config.DB_MAX_OVERFLOW,
+        pool_timeout_seconds=config.DB_POOL_TIMEOUT_SECONDS,
+        pool_recycle_seconds=config.DB_POOL_RECYCLE_SECONDS,
+        connect_timeout_seconds=config.DB_CONNECT_TIMEOUT_SECONDS,
+        statement_timeout_ms=config.DB_STATEMENT_TIMEOUT_MS,
+    )
     register_observability(api)
 
     api_key_dependency = build_api_key_dependency(config)

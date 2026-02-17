@@ -7,7 +7,7 @@ import time
 from unittest.mock import patch
 
 import pytest
-from conftest import StubResult
+from conftest import StubEngine, StubResult
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
@@ -682,3 +682,50 @@ def test_rate_limit_redis_backend_is_usable_with_custom_limiter(make_engine):
 
         second = tc.post("/api/echo", json={"n": 2})
         assert second.status_code == 429
+
+
+def test_create_app_applies_database_runtime_tuning():
+    captured = {}
+
+    def fake_create_engine(url, **kwargs):
+        captured["url"] = url
+        captured["kwargs"] = kwargs
+        return StubEngine(lambda *_: StubResult())
+
+    with patch("app.database.create_engine", side_effect=fake_create_engine):
+        app = create_app(
+            Config(
+                DB_POOL_SIZE=7,
+                DB_MAX_OVERFLOW=13,
+                DB_POOL_TIMEOUT_SECONDS=11,
+                DB_POOL_RECYCLE_SECONDS=1800,
+                DB_CONNECT_TIMEOUT_SECONDS=4,
+                DB_STATEMENT_TIMEOUT_MS=4500,
+            )
+        )
+
+    assert app is not None
+    kwargs = captured["kwargs"]
+    assert kwargs["pool_size"] == 7
+    assert kwargs["max_overflow"] == 13
+    assert kwargs["pool_timeout"] == 11
+    assert kwargs["pool_recycle"] == 1800
+    assert kwargs["connect_args"]["connect_timeout"] == 4
+    assert "statement_timeout=4500" in kwargs["connect_args"]["options"]
+    assert "application_name=civic_archive_api" in kwargs["connect_args"]["options"]
+
+
+@pytest.mark.parametrize(
+    ("config_overrides", "expected_message"),
+    [
+        ({"DB_POOL_SIZE": 0}, "DB_POOL_SIZE must be greater than 0."),
+        ({"DB_MAX_OVERFLOW": -1}, "DB_MAX_OVERFLOW must be greater than or equal to 0."),
+        ({"DB_POOL_TIMEOUT_SECONDS": 0}, "DB_POOL_TIMEOUT_SECONDS must be greater than 0."),
+        ({"DB_POOL_RECYCLE_SECONDS": 0}, "DB_POOL_RECYCLE_SECONDS must be greater than 0."),
+        ({"DB_CONNECT_TIMEOUT_SECONDS": 0}, "DB_CONNECT_TIMEOUT_SECONDS must be greater than 0."),
+        ({"DB_STATEMENT_TIMEOUT_MS": 0}, "DB_STATEMENT_TIMEOUT_MS must be greater than 0."),
+    ],
+)
+def test_create_app_rejects_invalid_database_runtime_tuning(config_overrides, expected_message):
+    with pytest.raises(RuntimeError, match=expected_message):
+        create_app(Config(**config_overrides))

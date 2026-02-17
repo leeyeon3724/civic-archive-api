@@ -18,6 +18,12 @@ class Config(BaseSettings):
     POSTGRES_USER: str = "app_user"
     POSTGRES_PASSWORD: str = "change_me"
     POSTGRES_DB: str = "civic_archive"
+    DB_POOL_SIZE: int = 10
+    DB_MAX_OVERFLOW: int = 20
+    DB_POOL_TIMEOUT_SECONDS: int = 30
+    DB_POOL_RECYCLE_SECONDS: int = 3600
+    DB_CONNECT_TIMEOUT_SECONDS: int = 3
+    DB_STATEMENT_TIMEOUT_MS: int = 5000
 
     DEBUG: bool = False
     APP_ENV: str = "development"
