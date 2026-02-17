@@ -287,6 +287,30 @@ def test_list_segments_returns_paginated_payload_and_filter_params(client, use_s
     assert first_select_params["date_to"] == "2025-01-31"
 
 
+def test_list_endpoints_ignore_blank_query_filter(client, use_stub_connection_provider):
+    endpoint_rows = {
+        "/api/news": {"id": 1, "title": "n1", "url": "https://example.com/n/1"},
+        "/api/minutes": {"id": 2, "council": "A", "url": "https://example.com/m/2"},
+        "/api/segments": {"id": 3, "council": "A"},
+    }
+
+    for endpoint, row in endpoint_rows.items():
+        call_state = {"calls": 0}
+
+        def handler(_statement, _params, *, _row=row, _call_state=call_state):
+            if _call_state["calls"] == 0:
+                _call_state["calls"] += 1
+                return StubResult(rows=[_row])
+            return StubResult(scalar_value=1)
+
+        engine = use_stub_connection_provider(handler)
+        resp = client.get(f"{endpoint}?q=%20%20%20&page=1&size=1")
+        assert resp.status_code == 200
+        params = extract_first_select_params(engine)
+        assert "q" not in params
+        assert "q_fts" not in params
+
+
 def test_get_segment_success_and_404(client, use_stub_connection_provider):
     def handler(_statement, params):
         if params["id"] == 1:

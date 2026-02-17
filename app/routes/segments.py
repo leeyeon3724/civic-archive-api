@@ -35,7 +35,7 @@ def save_segments(
                 "council": "seoul",
                 "committee": "budget",
                 "session": "301",
-                "meeting_no": "301 4차",
+                "meeting_no": "301 4\ucc28",
                 "meeting_date": "2026-02-17",
                 "content": "segment text",
                 "importance": 2,

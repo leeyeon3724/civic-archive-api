@@ -34,3 +34,37 @@ def test_insert_segments_counts_only_non_conflict_rows(segments_module, make_con
         connection_provider=connection_provider,
     )
     assert inserted == 2
+
+
+def test_normalize_segment_blank_and_none_optional_strings_share_dedupe_hash(segments_module):
+    blank_payload = {
+        "council": "A",
+        "committee": "",
+        "session": "",
+        "meeting_no": None,
+        "meeting_date": "2026-02-17",
+        "content": "",
+        "summary": "",
+        "subject": "",
+        "party": "",
+        "constituency": "",
+        "department": "",
+    }
+    none_payload = {
+        "council": "A",
+        "committee": None,
+        "session": None,
+        "meeting_no": None,
+        "meeting_date": "2026-02-17",
+        "content": None,
+        "summary": None,
+        "subject": None,
+        "party": None,
+        "constituency": None,
+        "department": None,
+    }
+
+    blank_normalized = segments_module.normalize_segment(blank_payload)
+    none_normalized = segments_module.normalize_segment(none_payload)
+
+    assert blank_normalized["dedupe_hash"] == none_normalized["dedupe_hash"]

@@ -107,7 +107,8 @@ def list_articles(
     conditions = []
     params: dict[str, Any] = {}
 
-    if q:
+    normalized_q = (q or "").strip()
+    if normalized_q:
         conditions.append(
             build_split_search_condition(
                 columns=[
@@ -117,7 +118,7 @@ def list_articles(
                 ]
             )
         )
-        params.update(build_split_search_params(q))
+        params.update(build_split_search_params(normalized_q))
 
     if source:
         conditions.append(NEWS_ARTICLES.c.source == bindparam("source"))

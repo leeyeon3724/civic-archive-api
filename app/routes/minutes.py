@@ -35,7 +35,7 @@ def save_minutes(
                 "council": "seoul",
                 "committee": "budget",
                 "session": "301",
-                "meeting_no": "301 4차",
+                "meeting_no": "301 4\ucc28",
                 "url": "https://example.com/minutes/100",
                 "meeting_date": "2026-02-17",
             }

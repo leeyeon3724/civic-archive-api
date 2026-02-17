@@ -157,7 +157,8 @@ def list_segments(
     conditions = []
     params: dict[str, Any] = {}
 
-    if q:
+    normalized_q = (q or "").strip()
+    if normalized_q:
         conditions.append(
             build_split_search_condition(
                 columns=[
@@ -176,7 +177,7 @@ def list_segments(
                 ]
             )
         )
-        params.update(build_split_search_params(q))
+        params.update(build_split_search_params(normalized_q))
 
     for param_name, column_expr, value in (
         ("council", COUNCIL_SPEECH_SEGMENTS.c.council, council),
