@@ -4,7 +4,12 @@ from typing import Any
 
 from sqlalchemy import Text, bindparam, cast, column, func, or_, select, table, text
 
-from app.repositories.common import execute_paginated_query, to_json_recordset
+from app.repositories.common import (
+    add_not_none_equals_filter,
+    add_truthy_equals_filter,
+    execute_filtered_paginated_query,
+    to_json_recordset,
+)
 from app.repositories.session_provider import ConnectionProvider, open_connection_scope
 
 COUNCIL_SPEECH_SEGMENTS = table(
@@ -170,37 +175,30 @@ def list_segments(
         )
         params["q"] = f"%{q}%"
 
-    if council:
-        conditions.append(COUNCIL_SPEECH_SEGMENTS.c.council == bindparam("council"))
-        params["council"] = council
+    for param_name, column_expr, value in (
+        ("council", COUNCIL_SPEECH_SEGMENTS.c.council, council),
+        ("committee", COUNCIL_SPEECH_SEGMENTS.c.committee, committee),
+        ("session", COUNCIL_SPEECH_SEGMENTS.c["session"], session),
+        ("meeting_no", COUNCIL_SPEECH_SEGMENTS.c.meeting_no_combined, meeting_no),
+        ("party", COUNCIL_SPEECH_SEGMENTS.c.party, party),
+        ("constituency", COUNCIL_SPEECH_SEGMENTS.c.constituency, constituency),
+        ("department", COUNCIL_SPEECH_SEGMENTS.c.department, department),
+    ):
+        add_truthy_equals_filter(
+            value=value,
+            param_name=param_name,
+            column_expr=column_expr,
+            conditions=conditions,
+            params=params,
+        )
 
-    if committee:
-        conditions.append(COUNCIL_SPEECH_SEGMENTS.c.committee == bindparam("committee"))
-        params["committee"] = committee
-
-    if session:
-        conditions.append(COUNCIL_SPEECH_SEGMENTS.c["session"] == bindparam("session"))
-        params["session"] = session
-
-    if meeting_no:
-        conditions.append(COUNCIL_SPEECH_SEGMENTS.c.meeting_no_combined == bindparam("meeting_no"))
-        params["meeting_no"] = meeting_no
-
-    if importance is not None:
-        conditions.append(COUNCIL_SPEECH_SEGMENTS.c.importance == bindparam("importance"))
-        params["importance"] = importance
-
-    if party:
-        conditions.append(COUNCIL_SPEECH_SEGMENTS.c.party == bindparam("party"))
-        params["party"] = party
-
-    if constituency:
-        conditions.append(COUNCIL_SPEECH_SEGMENTS.c.constituency == bindparam("constituency"))
-        params["constituency"] = constituency
-
-    if department:
-        conditions.append(COUNCIL_SPEECH_SEGMENTS.c.department == bindparam("department"))
-        params["department"] = department
+    add_not_none_equals_filter(
+        value=importance,
+        param_name="importance",
+        column_expr=COUNCIL_SPEECH_SEGMENTS.c.importance,
+        conditions=conditions,
+        params=params,
+    )
 
     if date_from:
         conditions.append(COUNCIL_SPEECH_SEGMENTS.c.meeting_date >= bindparam("date_from"))
@@ -239,14 +237,10 @@ def list_segments(
 
     count_stmt = select(func.count().label("total")).select_from(COUNCIL_SPEECH_SEGMENTS)
 
-    if conditions:
-        for condition in conditions:
-            list_stmt = list_stmt.where(condition)
-            count_stmt = count_stmt.where(condition)
-
-    return execute_paginated_query(
+    return execute_filtered_paginated_query(
         list_stmt=list_stmt,
         count_stmt=count_stmt,
+        conditions=conditions,
         params=params,
         page=page,
         size=size,

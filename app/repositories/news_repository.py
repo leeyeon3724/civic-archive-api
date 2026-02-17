@@ -4,7 +4,7 @@ from typing import Any
 
 from sqlalchemy import Date, Text, bindparam, cast, column, func, or_, select, table, text
 
-from app.repositories.common import dedupe_rows_by_key, execute_paginated_query, to_json_recordset
+from app.repositories.common import dedupe_rows_by_key, execute_filtered_paginated_query, to_json_recordset
 from app.repositories.session_provider import ConnectionProvider, open_connection_scope
 
 NEWS_ARTICLES = table(
@@ -154,14 +154,10 @@ def list_articles(
 
     count_stmt = select(func.count().label("total")).select_from(NEWS_ARTICLES)
 
-    if conditions:
-        for condition in conditions:
-            list_stmt = list_stmt.where(condition)
-            count_stmt = count_stmt.where(condition)
-
-    return execute_paginated_query(
+    return execute_filtered_paginated_query(
         list_stmt=list_stmt,
         count_stmt=count_stmt,
+        conditions=conditions,
         params=params,
         page=page,
         size=size,

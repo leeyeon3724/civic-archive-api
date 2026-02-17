@@ -6,7 +6,7 @@ from app.ports.repositories import MinutesRepositoryPort
 from app.ports.services import MinutesServicePort
 from app.repositories.minutes_repository import MinutesRepository
 from app.repositories.session_provider import ConnectionProvider, ensure_connection_provider
-from app.utils import bad_request, combine_meeting_no, parse_date
+from app.utils import bad_request, coerce_meeting_no_int, combine_meeting_no, parse_date
 
 
 def _normalize_minutes(item: dict[str, Any]) -> dict[str, Any]:
@@ -20,13 +20,7 @@ def _normalize_minutes(item: dict[str, Any]) -> dict[str, Any]:
 
     session = item.get("session")
     meeting_no_raw = item.get("meeting_no")
-
-    meeting_no_int = None
-    if meeting_no_raw is not None and not isinstance(meeting_no_raw, str):
-        try:
-            meeting_no_int = int(meeting_no_raw)
-        except (TypeError, ValueError):
-            meeting_no_int = None
+    meeting_no_int = coerce_meeting_no_int(meeting_no_raw)
 
     meeting_date = parse_date(item.get("meeting_date"))
 

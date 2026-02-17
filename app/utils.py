@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from typing import Any
 
 from fastapi import HTTPException
 
@@ -35,3 +36,12 @@ def combine_meeting_no(session_val, meeting_no_raw, meeting_no_int) -> str | Non
     if meeting_no_int is not None:
         return f"{int(meeting_no_int)}\ucc28"
     return session_val
+
+
+def coerce_meeting_no_int(meeting_no_raw: Any) -> int | None:
+    if meeting_no_raw is None or isinstance(meeting_no_raw, str):
+        return None
+    try:
+        return int(meeting_no_raw)
+    except (TypeError, ValueError):
+        return None

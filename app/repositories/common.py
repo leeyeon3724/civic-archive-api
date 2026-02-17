@@ -4,6 +4,8 @@ import json
 from datetime import date, datetime
 from typing import Any
 
+from sqlalchemy import bindparam
+
 from app.repositories.session_provider import ConnectionProvider, open_connection_scope
 
 
@@ -48,3 +50,54 @@ def execute_paginated_query(
         total = conn.execute(count_stmt, params).scalar() or 0
 
     return [dict(row) for row in rows], int(total)
+
+
+def add_truthy_equals_filter(
+    *,
+    value: Any,
+    param_name: str,
+    column_expr: Any,
+    conditions: list[Any],
+    params: dict[str, Any],
+) -> None:
+    if not value:
+        return
+    conditions.append(column_expr == bindparam(param_name))
+    params[param_name] = value
+
+
+def add_not_none_equals_filter(
+    *,
+    value: Any,
+    param_name: str,
+    column_expr: Any,
+    conditions: list[Any],
+    params: dict[str, Any],
+) -> None:
+    if value is None:
+        return
+    conditions.append(column_expr == bindparam(param_name))
+    params[param_name] = value
+
+
+def execute_filtered_paginated_query(
+    *,
+    list_stmt: Any,
+    count_stmt: Any,
+    conditions: list[Any],
+    params: dict[str, Any],
+    page: int,
+    size: int,
+    connection_provider: ConnectionProvider,
+) -> tuple[list[dict[str, Any]], int]:
+    for condition in conditions:
+        list_stmt = list_stmt.where(condition)
+        count_stmt = count_stmt.where(condition)
+    return execute_paginated_query(
+        list_stmt=list_stmt,
+        count_stmt=count_stmt,
+        params=params,
+        page=page,
+        size=size,
+        connection_provider=connection_provider,
+    )

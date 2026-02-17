@@ -4,7 +4,12 @@ from typing import Any
 
 from sqlalchemy import Text, bindparam, cast, column, func, or_, select, table, text
 
-from app.repositories.common import dedupe_rows_by_key, execute_paginated_query, to_json_recordset
+from app.repositories.common import (
+    add_truthy_equals_filter,
+    dedupe_rows_by_key,
+    execute_filtered_paginated_query,
+    to_json_recordset,
+)
 from app.repositories.session_provider import ConnectionProvider, open_connection_scope
 
 COUNCIL_MINUTES = table(
@@ -143,21 +148,19 @@ def list_minutes(
         )
         params["q"] = f"%{q}%"
 
-    if council:
-        conditions.append(COUNCIL_MINUTES.c.council == bindparam("council"))
-        params["council"] = council
-
-    if committee:
-        conditions.append(COUNCIL_MINUTES.c.committee == bindparam("committee"))
-        params["committee"] = committee
-
-    if session:
-        conditions.append(COUNCIL_MINUTES.c["session"] == bindparam("session"))
-        params["session"] = session
-
-    if meeting_no:
-        conditions.append(COUNCIL_MINUTES.c.meeting_no_combined == bindparam("meeting_no"))
-        params["meeting_no"] = meeting_no
+    for param_name, column_expr, value in (
+        ("council", COUNCIL_MINUTES.c.council, council),
+        ("committee", COUNCIL_MINUTES.c.committee, committee),
+        ("session", COUNCIL_MINUTES.c["session"], session),
+        ("meeting_no", COUNCIL_MINUTES.c.meeting_no_combined, meeting_no),
+    ):
+        add_truthy_equals_filter(
+            value=value,
+            param_name=param_name,
+            column_expr=column_expr,
+            conditions=conditions,
+            params=params,
+        )
 
     if date_from:
         conditions.append(COUNCIL_MINUTES.c.meeting_date >= bindparam("date_from"))
@@ -192,14 +195,10 @@ def list_minutes(
 
     count_stmt = select(func.count().label("total")).select_from(COUNCIL_MINUTES)
 
-    if conditions:
-        for condition in conditions:
-            list_stmt = list_stmt.where(condition)
-            count_stmt = count_stmt.where(condition)
-
-    return execute_paginated_query(
+    return execute_filtered_paginated_query(
         list_stmt=list_stmt,
         count_stmt=count_stmt,
+        conditions=conditions,
         params=params,
         page=page,
         size=size,
