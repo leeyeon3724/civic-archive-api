@@ -80,6 +80,9 @@ python -m alembic downgrade -1
 
 - API 상세: [docs/API.md](docs/API.md)
 - 아키텍처/설계: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+- 버전 정책: [docs/VERSIONING.md](docs/VERSIONING.md)
+- 변경 이력: [docs/CHANGELOG.md](docs/CHANGELOG.md)
+- 기여 가이드: [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md)
 
 ## 품질 게이트
 
@@ -90,6 +93,9 @@ python scripts/check_docs_routes.py
 # 스키마 정책 검사 (런타임 수동 DDL 금지)
 python scripts/check_schema_policy.py
 ```
+
+릴리스 태그(`vX.Y.Z`) 푸시 시 `/.github/workflows/release-tag.yml`에서
+태그 형식과 `docs/CHANGELOG.md` 버전 섹션을 자동 검증합니다.
 
 ## 통합 테스트 (PostgreSQL)
 
