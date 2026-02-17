@@ -16,7 +16,7 @@
 | P5 | Performance and scalability baseline | DB pool/runtime timeout tuning, query latency guardrails | Completed |
 | P6 | Runtime verification hardening | streaming request guard, observability label accuracy, integration/e2e reliability | Completed |
 | P7 | Engineering quality hardening | config safety, query correctness, quality gates uplift | Completed |
-| P8 | Architecture decomposition | create_app modularization, bootstrap boundaries, DI prep | In Progress |
+| P8 | Architecture decomposition | create_app modularization, bootstrap boundaries, DI prep | Completed |
 
 ## P1 Backlog (Current Scope)
 
@@ -270,13 +270,18 @@
 
 ### 2) Bootstrap Boundary Contracts
 
-- [ ] Add dedicated tests for each bootstrap module (validation/middleware/system-routes/handlers)
-- [ ] Define explicit contract for dependency injection surface between bootstrap and route/service layers
+- [x] Add dedicated tests for each bootstrap module (validation/middleware/system-routes/handlers)
+- [x] Define explicit contract for dependency injection surface between bootstrap and route/service layers
+  - contract: `register_domain_routes(api, protected_dependencies=...)` forwards auth/rate-limit dependencies
+  - contract: `register_system_routes(..., protected_dependencies=..., rate_limit_health_check=...)` receives injected health dependency
 
 ### 3) DI Migration Preparation
 
-- [ ] Introduce session provider abstraction replacing direct `database.engine` usage in repositories
-- [ ] Prepare phased migration plan: global engine -> provider -> repository injection
+- [x] Introduce session provider abstraction replacing direct `database.engine` usage in repositories
+- [x] Prepare phased migration plan: global engine -> provider -> repository injection
+  - phase 1 (completed): `app/repositories/session_provider.py` default provider wraps global engine scope
+  - phase 2 (completed): repository functions support optional injected `connection_provider`
+  - phase 3 (next): service layer constructor/provider injection to eliminate module-level repository calls
 
 ## Definition of Done (P8-Current)
 

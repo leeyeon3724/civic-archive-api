@@ -26,8 +26,10 @@ app/
 ├── observability.py     # request-id, 요청 로깅, Prometheus 메트릭
 ├── security.py          # API key 검증 + rate limit 의존성
 ├── bootstrap/           # 앱 부트스트랩 경계(검증/미들웨어/시스템 라우트/예외 핸들러)
+│   ├── contracts.py
 │   ├── validation.py
 │   ├── middleware.py
+│   ├── routes.py
 │   ├── system_routes.py
 │   └── exception_handlers.py
 ├── schemas.py           # Pydantic 요청/응답 모델
@@ -37,6 +39,7 @@ app/
 │   ├── minutes_service.py
 │   └── segments_service.py
 ├── repositories/        # SQL 실행/조회 레이어 (PostgreSQL 쿼리)
+│   ├── session_provider.py # DB 연결 scope provider (DI 준비 단계)
 │   ├── news_repository.py
 │   ├── minutes_repository.py
 │   └── segments_repository.py
@@ -71,7 +74,7 @@ tests/
 
 - route: HTTP 요청/응답 처리
 - service: 입력 정규화/비즈니스 검증
-- repository: SQL/DB 접근
+- repository: SQL/DB 접근 (`connection_provider` 주입 가능)
 
 흐름: `route -> service -> repository`
 
@@ -124,6 +127,7 @@ ASGI 엔트리포인트: `app.main:app`
 - 운영 strict 모드: `SECURITY_STRICT_MODE=1` 또는 `APP_ENV=production`에서 인증/호스트/CORS/rate-limit 가드 강제
 - DB 런타임 튜닝: `DB_POOL_SIZE`, `DB_MAX_OVERFLOW`, `DB_POOL_TIMEOUT_SECONDS`, `DB_CONNECT_TIMEOUT_SECONDS`, `DB_STATEMENT_TIMEOUT_MS`
 - ingest 안전 가드: `INGEST_MAX_BATCH_ITEMS`, `MAX_REQUEST_BODY_BYTES` 기반으로 oversized 요청을 `413`으로 차단
+- DB DI 준비: `app/repositories/session_provider.py`로 connection scope 추상화, repository는 선택적 `connection_provider` 주입 지원
 - 성능 회귀 체크: `scripts/benchmark_queries.py` + avg/p95 threshold 검사
 - 성능 임계값 프로파일: `docs/PERFORMANCE.md` + `scripts/benchmark_queries.py --profile <dev|staging|prod>`
 - 문서-코드 정합성: `scripts/check_docs_routes.py` + CI

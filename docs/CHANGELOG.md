@@ -30,6 +30,8 @@
 - e2e 도달성 검사 기반 skip 가드 추가 (`tests/test_e2e.py`)
 - P7 엔지니어링 품질 강화 백로그 추가 (`docs/REFACTOR_BACKLOG.md`)
 - P8 아키텍처 분해 백로그 추가 (`docs/REFACTOR_BACKLOG.md`)
+- bootstrap 경계 전용 계약 테스트 추가 (`tests/test_bootstrap_boundaries.py`)
+- repository 세션 provider/DI 계약 테스트 추가 (`tests/test_repository_session_provider.py`)
 
 ### 변경됨
 
@@ -56,6 +58,8 @@
 - 기여/운영/SLO 문서의 검증 명령을 lint/coverage 게이트 기준으로 정합화
 - `create_app()` 책임을 bootstrap 모듈(`validation`, `middleware`, `system_routes`, `exception_handlers`)로 분해
 - 아키텍처 문서에 bootstrap 경계와 초기화 조합 흐름을 반영
+- bootstrap 경계의 DI 계약을 명시하고 `register_domain_routes`/`register_system_routes` 단위 테스트로 고정
+- repository 계층의 DB 접근을 `session_provider` 추상화로 전환하고 optional `connection_provider` 주입 경로를 추가
 
 ### 수정됨
 
