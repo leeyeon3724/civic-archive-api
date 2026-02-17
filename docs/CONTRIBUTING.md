@@ -63,7 +63,7 @@ PR 본문에 아래 항목을 포함합니다.
 
 - `python scripts/check_commit_messages.py --rev-range origin/main..HEAD --mode fail`
 - `python -m ruff check app tests scripts`
-- `python scripts/check_mypy.py` (phase-2, blocking scope: `services/ports/repositories/observability`)
+- `python scripts/check_mypy.py` (phase-2, blocking; 기본 대상은 `app/__init__.py`, `app/bootstrap`, `app/routes`, `app/services`, `app/ports`, `app/repositories`, 주요 정책 스크립트)
 - `python -m pytest -q -m "not e2e and not integration" --cov=app --cov-report=term --cov-fail-under=85`
 - `python scripts/check_docs_routes.py`
 - `python scripts/check_schema_policy.py`

@@ -1,110 +1,32 @@
-# 변경 이력
+# Changelog
 
-이 문서는 프로젝트의 주요 변경 사항을 기록합니다.
+All notable changes to this project are documented in this file.
 
-형식은 Keep a Changelog를 참고하며, 버전 규칙은 Semantic Versioning을 따릅니다.
+The format is based on Keep a Changelog and this project follows Semantic Versioning.
 
 ## [Unreleased]
 
-### 추가됨
+### Added
+- Typed DTO boundary module for service/repository contracts (`app/ports/dto.py`).
+- Production compose baseline (`docker-compose.prod.yml`) with strict security defaults.
+- Search strategy split (trigram + FTS) and related index design for list endpoints.
 
-- 기여/버전 정책 문서 추가 (`docs/CONTRIBUTING.md`, `docs/VERSIONING.md`)
-- PR 템플릿 및 CODEOWNERS 기본 설정 추가
-- Redis 기반 분산 rate limiter 백엔드(`RATE_LIMIT_BACKEND=redis`, `REDIS_URL`) 지원 추가
-- 버전 단일 소스/변경이력 정합성 자동 검사 스크립트(`scripts/check_version_consistency.py`) 추가
-- 운영 헬스 분리를 위한 `GET /health/live`, `GET /health/ready` 엔드포인트 추가
-- `council_speech_segments.dedupe_hash` 및 고유 인덱스(중복 삽입 방지) 마이그레이션 추가
-- Redis rate limiter 운영 강화 옵션 추가 (`RATE_LIMIT_FAIL_OPEN`, `RATE_LIMIT_REDIS_FAILURE_COOLDOWN_SECONDS`)
-- JWT 인증/인가 옵션 추가 (`REQUIRE_JWT`, HS256 검증, 메서드별 scope, admin role 우회)
-- trusted proxy 경계 설정 추가 (`TRUSTED_PROXY_CIDRS`, 신뢰 CIDR에서만 `X-Forwarded-For` 사용)
-- 공급망 보안 워크플로우 추가 (`.github/workflows/security-supply-chain.yml`: CycloneDX SBOM, pip-audit)
-- SLO/운영 문서 추가 (`docs/SLO.md`, `docs/OPERATIONS.md`)
-- SLO 정책/배포 가드 스크립트 추가 (`scripts/check_slo_policy.py`, `scripts/check_runtime_health.py`)
-- DB 런타임 튜닝 옵션 추가 (`DB_POOL_SIZE`, `DB_MAX_OVERFLOW`, `DB_POOL_TIMEOUT_SECONDS`, `DB_POOL_RECYCLE_SECONDS`, `DB_CONNECT_TIMEOUT_SECONDS`, `DB_STATEMENT_TIMEOUT_MS`)
-- 성능 정책 문서 추가 (`docs/PERFORMANCE.md`: endpoint latency budget, benchmark profile)
-- ingest/load 안전 가드 옵션 추가 (`INGEST_MAX_BATCH_ITEMS`, `MAX_REQUEST_BODY_BYTES`)
-- 커밋 메시지 정책 검사 스크립트/로컬 훅 설치 스크립트 추가 (`scripts/check_commit_messages.py`, `scripts/install_git_hooks.ps1`)
-- P6 리팩토링 백로그 추가 (`streaming guard`, `metrics label accuracy`, `integration/e2e reliability`)
-- 관측성 라벨 정확도 회귀 테스트 추가 (`tests/test_observability_labels.py`)
-- 통합 테스트 범위 확장 (`tests/test_integration_postgres.py`: JWT runtime 경로, payload guard `413`, metrics label 검증)
-- e2e 도달성 검사 기반 skip 가드 추가 (`tests/test_e2e.py`)
-- P7 엔지니어링 품질 강화 백로그 추가 (`docs/REFACTOR_BACKLOG.md`)
-- P8 아키텍처 분해 백로그 추가 (`docs/REFACTOR_BACKLOG.md`)
-- bootstrap 경계 전용 계약 테스트 추가 (`tests/test_bootstrap_boundaries.py`)
-- repository 세션 provider/DI 계약 테스트 추가 (`tests/test_repository_session_provider.py`)
-- 서비스 DI override fixture 추가 (`tests/conftest.py`: `override_dependency`)
-- service/repository 포트 인터페이스 모듈 추가 (`app/ports/services.py`, `app/ports/repositories.py`)
-- 타입체크 스크립트/설정 추가 (`scripts/check_mypy.py`, `mypy.ini`)
-- JWT leeway 설정 추가 (`JWT_LEEWAY_SECONDS`)
-- E2E 실서버 검증 워크플로우 추가 (`.github/workflows/e2e-live.yml`, Docker Compose 기반)
-- 정적 보안 스캔 도구 추가 (`bandit`)
+### Changed
+- Security module decomposition into focused modules:
+  `security_jwt.py`, `security_rate_limit.py`, `security_proxy.py`, `security_dependencies.py`.
+- `published_at` storage and parsing policy aligned to UTC-aware semantics (`TIMESTAMPTZ` + UTC normalization).
+- Route docs gate upgraded to router auto-discovery (`scripts/check_docs_routes.py`).
+- Repository/service interfaces migrated from broad `dict[str, Any]` contracts to typed DTO contracts.
 
-### 변경됨
-
-- `routes` 공통 에러 응답 상수와 `repositories` 공통 쿼리 헬퍼를 도입해 중복 코드를 축소함
-- 라우트 계층의 저장소 직접 호출을 제거하고 `service` 오케스트레이션 경유 구조로 책임 경계를 정리함
-- metrics path 라벨 cardinality 보호를 위해 라우트 미매칭 요청을 `/_unmatched`로 집계
-- `/api/segments` 삽입 동작을 정규화 payload 기반 idempotent insert로 변경 (`ON CONFLICT DO NOTHING`)
-- metrics cardinality 보호 강화를 위해 알 수 없는 HTTP method 라벨을 `OTHER`로 정규화
-- 버전 정합성 검사 강화: changelog 구조 검증(`Unreleased`, 최신 릴리스 섹션) 및 release-tag 워크플로우 연동
-- `/api/*` 공통 에러 응답에 `403 (FORBIDDEN)` 계약 추가
-- 운영 strict 모드 추가 (`SECURITY_STRICT_MODE=1` 또는 `APP_ENV=production` 시 인증/호스트/CORS/rate-limit 가드 강제)
-- CI에 SLO 정책 기준선 검사 단계 추가 (`.github/workflows/docs-contract.yml`)
-- 앱 시작 시 DB 런타임 튜닝 값 검증을 추가하고 `init_db`에 풀/타임아웃 설정을 연결
-- benchmark 스크립트에 시나리오 태그/프로파일 임계값(`dev/staging/prod`)과 다중 임계값 평가를 추가
-- `/api/*` write 요청에 payload 크기/배치 수 상한 가드를 적용하고 초과 시 `413 PAYLOAD_TOO_LARGE`를 반환
-- CI에 커밋 메시지 정책 강제 단계 추가 (`.github/workflows/commit-message.yml`)
-- 요청 본문 상한 가드를 강화해 `Content-Length`와 실제 본문 길이를 함께 검증하도록 조정
-- 운영/성능/백로그 문서의 벤치마크 명령 및 상태 표기를 정합성 기준에 맞게 정리
-- 요청 본문 상한 가드를 스트리밍 누적 방식으로 조정해 미들웨어 full-body preload를 제거하고 초과 시 `413` 응답을 보장
-- payload guard 등 pre-route 실패 케이스에서도 metrics path 라벨이 라우트 템플릿(`/api/echo`)로 집계되도록 조정
-- DB 연결 문자열 생성을 SQLAlchemy URL builder 기반으로 전환해 특수문자 credentials 파싱 안전성 강화
-- `GET /api/news`의 `to` 날짜 경계 필터를 일 단위 inclusive semantics로 조정
-- CI 품질 게이트에 `ruff` 린트 및 `pytest --cov --cov-fail-under=85` 커버리지 하한을 추가
-- 기여/운영/SLO 문서의 검증 명령을 lint/coverage 게이트 기준으로 정합화
-- `create_app()` 책임을 bootstrap 모듈(`validation`, `middleware`, `system_routes`, `exception_handlers`)로 분해
-- 아키텍처 문서에 bootstrap 경계와 초기화 조합 흐름을 반영
-- bootstrap 경계의 DI 계약을 명시하고 `register_domain_routes`/`register_system_routes` 단위 테스트로 고정
-- repository 계층의 DB 접근을 `session_provider` 추상화로 전환하고 optional `connection_provider` 주입 경로를 추가
-- 서비스 계층을 생성자/팩토리 기반 DI로 전환하고 라우트에서 `Depends(get_*_service)` 주입을 사용
-- endpoint 테스트를 monkeypatch 기반에서 dependency override 기반으로 일원화
-- 서비스/리포지토리 Port Protocol 정의를 서비스 구현 파일에서 분리해 `app/ports/*`로 이동
-- CI 문서 계약 워크플로우에 phase-1 mypy 체크(경고 모드) 단계를 추가
-- JWT 검증을 수동 구현에서 `PyJWT` 기반 검증으로 전환하고 `sub`/`exp` 필수 정책을 적용
-- DB 접근 경로를 앱 상태 기반 `connection_provider` 주입으로 일원화하고 전역 `database.engine` 의존을 제거
-- 뉴스/회의록/세그먼트 배치 쓰기를 JSON recordset 기반 단일 SQL 실행으로 최적화해 row-by-row 루프를 제거
-- E2E 테스트에 `E2E_REQUIRE_TARGET=1` 강제 모드를 추가해 CI에서 skip 대신 실패로 검증 신뢰성을 강화
-- 배치 upsert 입력에서 동일 `url` 중복을 사전 dedupe(마지막 항목 우선)해 단일 배치 충돌 리스크를 제거
-- observability 미들웨어의 상태코드 판별/로그 payload/메트릭 관측 로직을 순수 함수로 분리
-- `check_runtime_health.py` HTTP 호출을 `requests` 기반으로 정리하고 URL scheme 제한을 추가
-- mypy 기본 실행 모드를 `fail`로 승격하고 검사 범위를 `repositories`/`observability`까지 확장
-- CI 문서 계약 워크플로우의 mypy 단계를 phase-2 blocking 모드로 승격
-- repository list 쿼리(news/minutes/segments)를 SQLAlchemy 표현식 기반 빌더로 전환해 동적 SQL 문자열 조합을 제거
-- 공급망 보안 워크플로우 Bandit 실행에서 `B608` 임시 제외를 제거하고 전체 규칙을 활성화
-- 테스트 부트스트랩에 test config factory를 도입해 `.env` 영향 없이 결정적으로 앱 설정을 주입하도록 정리
-- 리팩토링 로드맵 실행 티켓(P0/P1/P2)을 `docs/REFACTOR_BACKLOG.md`에 우선순위/완료조건/리스크 형식으로 추가
-- mypy blocking 범위를 `app.__init__/bootstrap/routes`까지 확장하고 관련 타입 불일치를 보강
-- JWT 검증/인가 로직을 `app/security_jwt.py` 모듈로 분리해 `security.py` 책임을 단계적으로 축소
-- 날짜/시간 파싱 로직을 `app/parsing.py`로 통합해 `schemas`/`utils` 중복 구현을 제거
-- 테스트 더블(`StubConnection`)에 statement object 기록을 추가하고 일부 SQL 문자열 결합 검증을 파라미터 기반으로 전환
-- 저장소 루트에 `.editorconfig`를 추가해 UTF-8/LF 인코딩 정책을 명시하고 편집기별 인코딩 편차를 방지
-- 개발 의존성의 `pytest`를 `9.0.2`로 갱신하고 런타임 의존성의 `PyJWT` 최소 버전을 `2.11`로 상향
-- Dockerfile에서 `PORT`를 `ARG`/`ENV`로 일원화하고 `EXPOSE`/`CMD` 경로에서 동일 변수를 사용하도록 정리
-- `Config`의 DB URL 계산 프로퍼티를 `database_url`로 정리하고 앱/마이그레이션/벤치마크 호출부를 일관되게 갱신
-- 테스트 더블 메서드 중 인스턴스 상태를 사용하지 않는 항목을 `@staticmethod`로 명시해 정적 분석 경고를 제거
-- 벤치마크 스크립트의 CamelCase import alias(`Config as config_class`)를 제거해 PEP8 naming 경고를 해소
-
-### 수정됨
-
-- 인코딩 깨짐(mojibake)으로 훼손된 날짜/회의차수 관련 오류 메시지와 문자열 조합 로직 정리
+### Fixed
+- Tests decoupled from SQL rendering text shape where not contractually required.
+- JWT secret minimum length enforcement under strict/required JWT paths.
 
 ## [0.1.0] - 2026-02-17
 
-### 추가됨
+### Added
+- Initial FastAPI + PostgreSQL API release.
+- Domain APIs for news, council minutes, and speech segments (ingest/list/detail/delete).
+- Alembic migration workflow and CI quality/policy gates.
+- Standardized error schema and request-id based observability.
 
-- FastAPI + PostgreSQL 기반 API 초기 버전
-- Pydantic 요청/응답 모델 및 OpenAPI 문서화
-- 표준 에러 스키마 (`code/message/error/request_id/details`)
-- 관측성 기본선 (`request-id`, 구조화 로그, `/metrics`)
-- Alembic 마이그레이션 정책 및 CI 품질 게이트
-- PostgreSQL 통합 테스트 및 벤치마크 점검 스크립트

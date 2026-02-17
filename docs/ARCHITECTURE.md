@@ -40,6 +40,7 @@ app/
 ├── schemas.py           # Pydantic 요청/응답 모델
 ├── utils.py             # 파서/페이로드 검증 공통 함수
 ├── ports/               # 서비스/리포지토리 포트 인터페이스 (Protocol)
+│   ├── dto.py           # 계층 경계용 TypedDict DTO
 │   ├── repositories.py
 │   └── services.py
 ├── services/            # 입력 정규화/검증 레이어
