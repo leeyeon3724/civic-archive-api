@@ -151,21 +151,21 @@ def utils_module():
 
 @pytest.fixture(scope="session")
 def news_module():
-    from app.routes import news
+    from app.services import news_service as news
 
     return news
 
 
 @pytest.fixture(scope="session")
 def minutes_module():
-    from app.routes import minutes
+    from app.services import minutes_service as minutes
 
     return minutes
 
 
 @pytest.fixture(scope="session")
 def segments_module():
-    from app.routes import segments
+    from app.services import segments_service as segments
 
     return segments
 
@@ -174,6 +174,15 @@ def segments_module():
 def client(app_instance):
     with TestClient(app_instance) as tc:
         yield ClientAdapter(tc)
+
+
+@pytest.fixture
+def override_dependency(app_instance):
+    def _override(dependency, provider):
+        app_instance.dependency_overrides[dependency] = provider
+
+    yield _override
+    app_instance.dependency_overrides.clear()
 
 
 @pytest.fixture

@@ -1,6 +1,9 @@
 ﻿from conftest import StubResult
 
 
+from app.services.providers import get_minutes_service, get_segments_service
+
+
 def _assert_not_found_error(payload):
     assert payload["error"] == "Not Found"
     assert payload["code"] == "NOT_FOUND"
@@ -66,8 +69,15 @@ def test_upsert_minutes_counts_insert_and_update(db_module, minutes_module, monk
     assert updated == 2
 
 
-def test_save_minutes_accepts_object_and_list(client, minutes_module, monkeypatch):
-    monkeypatch.setattr(minutes_module, "upsert_minutes", lambda items: (len(items), 0))
+def test_save_minutes_accepts_object_and_list(client, override_dependency):
+    class FakeMinutesService:
+        def normalize_minutes(self, item):
+            return item
+
+        def upsert_minutes(self, items):
+            return (len(items), 0)
+
+    override_dependency(get_minutes_service, lambda: FakeMinutesService())
 
     one = client.post("/api/minutes", json={"council": "A", "url": "u1"})
     assert one.status_code == 201
@@ -196,8 +206,15 @@ def test_delete_minutes_success_and_not_found(client, db_module, monkeypatch, ma
     _assert_not_found_error(miss_resp.get_json())
 
 
-def test_save_segments_accepts_object_and_list(client, segments_module, monkeypatch):
-    monkeypatch.setattr(segments_module, "insert_segments", lambda items: len(items))
+def test_save_segments_accepts_object_and_list(client, override_dependency):
+    class FakeSegmentsService:
+        def normalize_segment(self, item):
+            return item
+
+        def insert_segments(self, items):
+            return len(items)
+
+    override_dependency(get_segments_service, lambda: FakeSegmentsService())
 
     one = client.post("/api/segments", json={"council": "A"})
     assert one.status_code == 201

@@ -14,6 +14,7 @@ from sqlalchemy.engine import make_url
 
 from app import create_app
 from app.config import Config
+from app.services.providers import get_news_service
 from app.version import APP_VERSION
 
 def _assert_not_found_error(payload):
@@ -155,8 +156,15 @@ def test_validation_error_returns_standard_error_with_details(client):
     assert payload["request_id"] == request_id
 
 
-def test_save_news_accepts_object_and_list(client, news_module, monkeypatch):
-    monkeypatch.setattr(news_module, "upsert_articles", lambda items: (len(items), 0))
+def test_save_news_accepts_object_and_list(client, override_dependency):
+    class FakeNewsService:
+        def normalize_article(self, item):
+            return item
+
+        def upsert_articles(self, items):
+            return (len(items), 0)
+
+    override_dependency(get_news_service, lambda: FakeNewsService())
 
     one = client.post("/api/news", json={"title": "t1", "url": "u1"})
     assert one.status_code == 201
