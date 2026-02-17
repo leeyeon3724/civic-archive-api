@@ -8,6 +8,7 @@ from fastapi import FastAPI, Request, Response
 from fastapi.exceptions import RequestValidationError
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.routing import Match
 
 REQUEST_COUNT = Counter(
     "civic_archive_http_requests_total",
@@ -25,11 +26,33 @@ MAX_PATH_LABEL_LENGTH = 96
 logger = logging.getLogger("civic_archive.api")
 
 
-def _route_template(request: Request) -> str:
+def _resolve_route_template_from_router(request: Request, api: FastAPI | None = None) -> str | None:
+    if api is None:
+        return None
+
+    scope = request.scope
+    for route in api.router.routes:
+        try:
+            matched, _ = route.matches(scope)
+        except Exception:
+            continue
+        if matched != Match.FULL:
+            continue
+        route_path = getattr(route, "path", None)
+        if route_path:
+            return str(route_path)
+    return None
+
+
+def _route_template(request: Request, api: FastAPI | None = None) -> str:
     route = request.scope.get("route")
     route_path = getattr(route, "path", None)
     if route_path:
         return str(route_path)
+
+    resolved = _resolve_route_template_from_router(request, api)
+    if resolved:
+        return resolved
     return "/_unmatched"
 
 
@@ -40,8 +63,8 @@ def _metric_method_label(method: str | None) -> str:
     return "OTHER"
 
 
-def _metric_path_label(request: Request) -> str:
-    path = _route_template(request)
+def _metric_path_label(request: Request, api: FastAPI | None = None) -> str:
+    path = _route_template(request, api)
     if len(path) > MAX_PATH_LABEL_LENGTH:
         return "/_label_too_long"
     return path
@@ -66,7 +89,7 @@ def register_observability(api: FastAPI) -> None:
         except Exception as exc:
             elapsed = time.perf_counter() - started
             method = _metric_method_label(request.method)
-            path = _metric_path_label(request)
+            path = _metric_path_label(request, api)
             status_code = 500
             if isinstance(exc, RequestValidationError):
                 status_code = 400
@@ -98,7 +121,7 @@ def register_observability(api: FastAPI) -> None:
 
         elapsed = time.perf_counter() - started
         method = _metric_method_label(request.method)
-        path = _metric_path_label(request)
+        path = _metric_path_label(request, api)
         status_code = int(response.status_code)
         status_label = _metric_status_label(status_code)
         REQUEST_COUNT.labels(method, path, status_label).inc()
