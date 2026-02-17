@@ -57,7 +57,8 @@ PR 본문에 아래 항목을 포함합니다.
   - `docs/API.md` 업데이트
   - 변경된 요청/응답/에러 예시 반영
 - 성능 민감 변경 PR
-  - `python scripts/benchmark_queries.py` 결과 첨부
+  - `python scripts/benchmark_queries.py --profile staging` 결과 첨부
+  - baseline 대비 benchmark delta(`ms` 또는 `%`)를 PR 본문에 기록
 - 보안/공급망 변경 PR
   - `pip-audit -r requirements.txt -r requirements-dev.txt`
   - 필요 시 SBOM 갱신/첨부 (`cyclonedx-py requirements ...`)

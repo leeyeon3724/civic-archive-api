@@ -113,6 +113,7 @@ python -m alembic downgrade -1
 
 - API 상세: [docs/API.md](docs/API.md)
 - 아키텍처/설계: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+- 성능 정책: [docs/PERFORMANCE.md](docs/PERFORMANCE.md)
 - SLO 정책: [docs/SLO.md](docs/SLO.md)
 - 운영 런북: [docs/OPERATIONS.md](docs/OPERATIONS.md)
 - 버전 정책: [docs/VERSIONING.md](docs/VERSIONING.md)
@@ -158,6 +159,6 @@ python scripts/check_runtime_health.py --base-url http://localhost:8000
 대표 조회 쿼리 3종(news/minutes/segments) 응답시간을 측정합니다.
 
 ```bash
-# 평균/95퍼센타일 임계값(ms) 초과 시 실패
-BENCH_FAIL_THRESHOLD_MS=250 BENCH_FAIL_P95_THRESHOLD_MS=400 python scripts/benchmark_queries.py
+# staging 프로파일 + 평균/95퍼센타일 공통 임계값(ms) 초과 시 실패
+BENCH_PROFILE=staging BENCH_FAIL_THRESHOLD_MS=250 BENCH_FAIL_P95_THRESHOLD_MS=400 python scripts/benchmark_queries.py
 ```

@@ -116,6 +116,7 @@ ASGI 엔트리포인트: `app.main:app`
 - 운영 strict 모드: `SECURITY_STRICT_MODE=1` 또는 `APP_ENV=production`에서 인증/호스트/CORS/rate-limit 가드 강제
 - DB 런타임 튜닝: `DB_POOL_SIZE`, `DB_MAX_OVERFLOW`, `DB_POOL_TIMEOUT_SECONDS`, `DB_CONNECT_TIMEOUT_SECONDS`, `DB_STATEMENT_TIMEOUT_MS`
 - 성능 회귀 체크: `scripts/benchmark_queries.py` + avg/p95 threshold 검사
+- 성능 임계값 프로파일: `docs/PERFORMANCE.md` + `scripts/benchmark_queries.py --profile <dev|staging|prod>`
 - 문서-코드 정합성: `scripts/check_docs_routes.py` + CI
 - 버전 정합성: `scripts/check_version_consistency.py` + CI
 - 공급망 보안: `.github/workflows/security-supply-chain.yml` (CycloneDX SBOM + pip-audit)

@@ -47,6 +47,7 @@
 3. 문서/이력
 - 버전 릴리스 시 `docs/CHANGELOG.md`에 해당 버전 섹션을 추가합니다.
 - API 변경 시 `docs/API.md`, 구조/운영 변경 시 `docs/ARCHITECTURE.md`를 함께 갱신합니다.
+- 성능 민감 변경 포함 릴리스는 `docs/PERFORMANCE.md` 기준 benchmark delta를 릴리스 노트에 기록합니다.
 
 4. 태그/배포
 - `main`의 릴리스 커밋에서 `vX.Y.Z` 태그를 생성합니다.

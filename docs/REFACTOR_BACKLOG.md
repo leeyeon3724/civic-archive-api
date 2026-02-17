@@ -156,9 +156,9 @@
 
 ### 2) Query Latency Guardrails
 
-- [ ] Define endpoint-level latency budgets and threshold mapping (news/minutes/segments)
-- [ ] Add benchmark scenario tags and threshold profiles (dev/staging/prod)
-- [ ] Add release-note template item for benchmark delta reporting
+- [x] Define endpoint-level latency budgets and threshold mapping (news/minutes/segments)
+- [x] Add benchmark scenario tags and threshold profiles (dev/staging/prod)
+- [x] Add release-note template item for benchmark delta reporting
 
 ### 3) Throughput and Load Safety
 

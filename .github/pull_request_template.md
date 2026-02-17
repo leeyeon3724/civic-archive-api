@@ -43,7 +43,16 @@ Revision:
 ## 성능
 
 - [ ] 성능 민감 변경 아님
-- [ ] `python scripts/benchmark_queries.py` 실행
+- [ ] `python scripts/benchmark_queries.py --profile staging` 실행
+- [ ] benchmark delta 작성 (baseline 대비)
+
+### Benchmark Delta (성능 민감 변경 시)
+
+| Scenario | Baseline p95(ms) | Current p95(ms) | Delta |
+|----------|------------------|-----------------|-------|
+| news_list |  |  |  |
+| minutes_list |  |  |  |
+| segments_list |  |  |  |
 
 ## 리스크 / 롤백
 
