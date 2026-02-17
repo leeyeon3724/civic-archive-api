@@ -10,6 +10,7 @@ import pytest
 from conftest import StubEngine, StubResult
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
+from sqlalchemy.engine import make_url
 
 from app import create_app
 from app.config import Config
@@ -309,6 +310,22 @@ def test_openapi_version_uses_app_version_constant(client):
     resp = client.get("/openapi.json")
     assert resp.status_code == 200
     assert resp.get_json()["info"]["version"] == APP_VERSION
+
+
+def test_database_url_preserves_special_character_credentials():
+    config = Config(
+        POSTGRES_HOST="db.internal",
+        POSTGRES_PORT=5432,
+        POSTGRES_USER="app-user",
+        POSTGRES_PASSWORD="pa:ss@word",
+        POSTGRES_DB="archive",
+    )
+
+    parsed = make_url(config.DATABASE_URL)
+    assert parsed.username == "app-user"
+    assert parsed.password == "pa:ss@word"
+    assert parsed.host == "db.internal"
+    assert parsed.database == "archive"
 
 
 def test_api_key_required_for_protected_endpoint(make_engine):

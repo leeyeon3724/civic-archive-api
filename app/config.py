@@ -4,6 +4,7 @@ from typing import List
 
 from pydantic import computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from sqlalchemy.engine import URL
 
 
 class Config(BaseSettings):
@@ -62,10 +63,14 @@ class Config(BaseSettings):
     @computed_field
     @property
     def DATABASE_URL(self) -> str:
-        return (
-            f"postgresql+psycopg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}"
-            f"@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
-        )
+        return URL.create(
+            "postgresql+psycopg",
+            username=self.POSTGRES_USER,
+            password=self.POSTGRES_PASSWORD,
+            host=self.POSTGRES_HOST,
+            port=int(self.POSTGRES_PORT),
+            database=self.POSTGRES_DB,
+        ).render_as_string(hide_password=False)
 
     @staticmethod
     def _parse_csv(value: str) -> List[str]:
