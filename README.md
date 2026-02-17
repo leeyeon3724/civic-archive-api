@@ -39,6 +39,8 @@ Copy-Item .env.example .env
 | `POSTGRES_PASSWORD` | `change_me` | DB 비밀번호 |
 | `POSTGRES_DB` | `civic_archive` | DB 이름 |
 | `DEBUG` | `0` | 서버 debug/reload 모드 |
+| `APP_ENV` | `development` | 실행 환경 (`development`/`staging`/`production`) |
+| `SECURITY_STRICT_MODE` | `0` | `1`이면 운영 보안 가드 강제(아래 설명 참고) |
 | `PORT` | `8000` | 서버 포트 |
 | `BOOTSTRAP_TABLES_ON_STARTUP` | `0` | 정책상 항상 `0` (수동 DDL 금지) |
 | `LOG_LEVEL` | `INFO` | 로그 레벨 |
@@ -78,6 +80,11 @@ Copy-Item .env.example .env
 - 기본값(`REQUIRE_API_KEY=0`)은 로컬 개발 편의를 위한 설정입니다.
 - 운영 환경에서는 `REQUIRE_API_KEY=1`, `API_KEY=<secret>` 적용을 권장합니다.
 - 운영 환경에서는 `REQUIRE_JWT=1`과 scope/role 정책 적용을 권장합니다.
+- `SECURITY_STRICT_MODE=1` 또는 `APP_ENV=production`이면 아래 항목이 강제됩니다.
+  - 인증 필수 (`REQUIRE_API_KEY=1` 또는 `REQUIRE_JWT=1`)
+  - `ALLOWED_HOSTS` wildcard 금지
+  - `CORS_ALLOW_ORIGINS` wildcard 금지
+  - `RATE_LIMIT_PER_MINUTE > 0`
 - `RATE_LIMIT_PER_MINUTE`로 `/api/*` 엔드포인트 요청 제한을 활성화할 수 있습니다.
 - 다중 인스턴스 환경에서는 `RATE_LIMIT_BACKEND=redis`, `REDIS_URL=redis://...` 구성을 권장합니다.
 - Redis 장애 시 동작은 `RATE_LIMIT_FAIL_OPEN`과 `RATE_LIMIT_REDIS_FAILURE_COOLDOWN_SECONDS`로 제어합니다.
@@ -115,6 +122,10 @@ python scripts/check_schema_policy.py
 
 # 버전 정책 검사 (단일 소스 + 변경 이력 정합성)
 python scripts/check_version_consistency.py
+
+# 공급망 보안 점검 (선택)
+cyclonedx-py requirements --output-reproducible --of JSON -o sbom-runtime.cdx.json requirements.txt
+pip-audit -r requirements.txt -r requirements-dev.txt
 ```
 
 릴리스 태그(`vX.Y.Z`) 푸시 시 `/.github/workflows/release-tag.yml`에서

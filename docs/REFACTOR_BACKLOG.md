@@ -11,7 +11,7 @@
 |----------|-------|-------|--------|
 | P1 | Operational baseline and correctness | readiness (DB/Redis), segments idempotency, mojibake cleanup | Completed |
 | P2 | Operations hardening | Redis rate limiter hardening, metrics cardinality protection, version policy automation | Completed |
-| P3 | Security and operations hardening | JWT/RBAC, trusted proxy chain validation, SBOM/vulnerability scan | In Progress |
+| P3 | Security and operations hardening | JWT/RBAC, trusted proxy chain validation, SBOM/vulnerability scan | Completed |
 | P4 | SLO and observability ops | SLI/SLO, error budget policy, alert policy | Pending |
 
 ## P1 Backlog (Current Scope)
@@ -94,12 +94,12 @@
 
 - [x] Add startup validation for JWT config and algorithm support
 - [x] Extend common error contracts with `403 FORBIDDEN`
-- [ ] Add production profile presets for strict defaults (deferred to next P3 patch)
+- [x] Add production profile presets for strict defaults (`SECURITY_STRICT_MODE`/`APP_ENV=production`)
 
 ### 4) Supply Chain Baseline
 
-- [ ] Add SBOM generation/check workflow
-- [ ] Add vulnerability scanning workflow
+- [x] Add SBOM generation/check workflow
+- [x] Add vulnerability scanning workflow
 
 ## Definition of Done (P3-Current)
 

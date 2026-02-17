@@ -111,6 +111,8 @@ ASGI 엔트리포인트: `app.main:app`
 - 분산 rate-limit: `RATE_LIMIT_BACKEND=redis`, `REDIS_URL`로 멀티 인스턴스 환경 지원
 - Redis limiter 안정화: 장애 시 쿨다운(`RATE_LIMIT_REDIS_FAILURE_COOLDOWN_SECONDS`) + fallback(`RATE_LIMIT_FAIL_OPEN`) 지원
 - 프록시 신뢰 경계: `TRUSTED_PROXY_CIDRS`에 매치되는 원격 IP에서만 `X-Forwarded-For`를 신뢰
+- 운영 strict 모드: `SECURITY_STRICT_MODE=1` 또는 `APP_ENV=production`에서 인증/호스트/CORS/rate-limit 가드 강제
 - 성능 회귀 체크: `scripts/benchmark_queries.py` + avg/p95 threshold 검사
 - 문서-코드 정합성: `scripts/check_docs_routes.py` + CI
 - 버전 정합성: `scripts/check_version_consistency.py` + CI
+- 공급망 보안: `.github/workflows/security-supply-chain.yml` (CycloneDX SBOM + pip-audit)

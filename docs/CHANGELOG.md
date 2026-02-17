@@ -17,6 +17,7 @@
 - Redis rate limiter 운영 강화 옵션 추가 (`RATE_LIMIT_FAIL_OPEN`, `RATE_LIMIT_REDIS_FAILURE_COOLDOWN_SECONDS`)
 - JWT 인증/인가 옵션 추가 (`REQUIRE_JWT`, HS256 검증, 메서드별 scope, admin role 우회)
 - trusted proxy 경계 설정 추가 (`TRUSTED_PROXY_CIDRS`, 신뢰 CIDR에서만 `X-Forwarded-For` 사용)
+- 공급망 보안 워크플로우 추가 (`.github/workflows/security-supply-chain.yml`: CycloneDX SBOM, pip-audit)
 
 ### 변경됨
 
@@ -27,6 +28,7 @@
 - metrics cardinality 보호 강화를 위해 알 수 없는 HTTP method 라벨을 `OTHER`로 정규화
 - 버전 정합성 검사 강화: changelog 구조 검증(`Unreleased`, 최신 릴리스 섹션) 및 release-tag 워크플로우 연동
 - `/api/*` 공통 에러 응답에 `403 (FORBIDDEN)` 계약 추가
+- 운영 strict 모드 추가 (`SECURITY_STRICT_MODE=1` 또는 `APP_ENV=production` 시 인증/호스트/CORS/rate-limit 가드 강제)
 
 ### 수정됨
 

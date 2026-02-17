@@ -57,6 +57,9 @@ PR 본문에 아래 항목을 포함합니다.
   - 변경된 요청/응답/에러 예시 반영
 - 성능 민감 변경 PR
   - `python scripts/benchmark_queries.py` 결과 첨부
+- 보안/공급망 변경 PR
+  - `pip-audit -r requirements.txt -r requirements-dev.txt`
+  - 필요 시 SBOM 갱신/첨부 (`cyclonedx-py requirements ...`)
 
 ## 코드 리뷰 포인트
 
