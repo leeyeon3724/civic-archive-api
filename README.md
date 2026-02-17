@@ -107,6 +107,8 @@ python -m alembic downgrade -1
 
 - API 상세: [docs/API.md](docs/API.md)
 - 아키텍처/설계: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+- SLO 정책: [docs/SLO.md](docs/SLO.md)
+- 운영 런북: [docs/OPERATIONS.md](docs/OPERATIONS.md)
 - 버전 정책: [docs/VERSIONING.md](docs/VERSIONING.md)
 - 변경 이력: [docs/CHANGELOG.md](docs/CHANGELOG.md)
 - 기여 가이드: [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md)
@@ -123,6 +125,9 @@ python scripts/check_schema_policy.py
 # 버전 정책 검사 (단일 소스 + 변경 이력 정합성)
 python scripts/check_version_consistency.py
 
+# SLO 정책 문서 검사
+python scripts/check_slo_policy.py
+
 # 공급망 보안 점검 (선택)
 cyclonedx-py requirements --output-reproducible --of JSON -o sbom-runtime.cdx.json requirements.txt
 pip-audit -r requirements.txt -r requirements-dev.txt
@@ -137,6 +142,9 @@ pip-audit -r requirements.txt -r requirements-dev.txt
 docker compose up -d db
 python -m alembic upgrade head
 RUN_INTEGRATION=1 python -m pytest -m integration
+
+# 배포 전 런타임 헬스 가드
+python scripts/check_runtime_health.py --base-url http://localhost:8000
 ```
 
 ## 성능 회귀 체크

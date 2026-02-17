@@ -51,6 +51,8 @@ scripts/
 ├── benchmark_queries.py # 대표 조회 쿼리 성능 회귀 체크
 ├── check_docs_routes.py # API.md 라우트 계약 + README 링크 검사
 ├── check_schema_policy.py # 런타임 수동 DDL 금지 정책 검사
+├── check_slo_policy.py  # SLO 정책 문서 기준선 검사
+├── check_runtime_health.py # 배포 전 liveness/readiness 가드 검사
 └── check_version_consistency.py # APP_VERSION <-> app/__init__.py <-> CHANGELOG 정합성 검사
 Dockerfile
 docker-compose.yml
@@ -116,3 +118,4 @@ ASGI 엔트리포인트: `app.main:app`
 - 문서-코드 정합성: `scripts/check_docs_routes.py` + CI
 - 버전 정합성: `scripts/check_version_consistency.py` + CI
 - 공급망 보안: `.github/workflows/security-supply-chain.yml` (CycloneDX SBOM + pip-audit)
+- SLO 운영 가드: `docs/SLO.md`, `docs/OPERATIONS.md`, `scripts/check_slo_policy.py`, `scripts/check_runtime_health.py`

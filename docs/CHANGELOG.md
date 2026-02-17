@@ -18,6 +18,8 @@
 - JWT 인증/인가 옵션 추가 (`REQUIRE_JWT`, HS256 검증, 메서드별 scope, admin role 우회)
 - trusted proxy 경계 설정 추가 (`TRUSTED_PROXY_CIDRS`, 신뢰 CIDR에서만 `X-Forwarded-For` 사용)
 - 공급망 보안 워크플로우 추가 (`.github/workflows/security-supply-chain.yml`: CycloneDX SBOM, pip-audit)
+- SLO/운영 문서 추가 (`docs/SLO.md`, `docs/OPERATIONS.md`)
+- SLO 정책/배포 가드 스크립트 추가 (`scripts/check_slo_policy.py`, `scripts/check_runtime_health.py`)
 
 ### 변경됨
 
@@ -29,6 +31,7 @@
 - 버전 정합성 검사 강화: changelog 구조 검증(`Unreleased`, 최신 릴리스 섹션) 및 release-tag 워크플로우 연동
 - `/api/*` 공통 에러 응답에 `403 (FORBIDDEN)` 계약 추가
 - 운영 strict 모드 추가 (`SECURITY_STRICT_MODE=1` 또는 `APP_ENV=production` 시 인증/호스트/CORS/rate-limit 가드 강제)
+- CI에 SLO 정책 기준선 검사 단계 추가 (`.github/workflows/docs-contract.yml`)
 
 ### 수정됨
 

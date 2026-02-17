@@ -45,6 +45,7 @@ PR 본문에 아래 항목을 포함합니다.
 - `python scripts/check_docs_routes.py`
 - `python scripts/check_schema_policy.py`
 - `python scripts/check_version_consistency.py`
+- `python scripts/check_slo_policy.py`
 
 추가 검증 규칙:
 
@@ -60,6 +61,8 @@ PR 본문에 아래 항목을 포함합니다.
 - 보안/공급망 변경 PR
   - `pip-audit -r requirements.txt -r requirements-dev.txt`
   - 필요 시 SBOM 갱신/첨부 (`cyclonedx-py requirements ...`)
+- 운영/가용성 변경 PR
+  - `python scripts/check_runtime_health.py --base-url <target>`
 
 ## 코드 리뷰 포인트
 

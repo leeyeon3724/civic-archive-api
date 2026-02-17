@@ -12,7 +12,7 @@
 | P1 | Operational baseline and correctness | readiness (DB/Redis), segments idempotency, mojibake cleanup | Completed |
 | P2 | Operations hardening | Redis rate limiter hardening, metrics cardinality protection, version policy automation | Completed |
 | P3 | Security and operations hardening | JWT/RBAC, trusted proxy chain validation, SBOM/vulnerability scan | Completed |
-| P4 | SLO and observability ops | SLI/SLO, error budget policy, alert policy | Pending |
+| P4 | SLO and observability ops | SLI/SLO, error budget policy, alert policy | Completed |
 
 ## P1 Backlog (Current Scope)
 
@@ -107,4 +107,39 @@
 - Docs-route contract check passes
 - Schema policy check passes
 - Version consistency check passes
+- `docs/CHANGELOG.md` updated
+
+## P4 Backlog (Current Scope)
+
+### 1) SLI/SLO Policy
+
+- [x] Define SLI/SLO targets for availability and latency
+- [x] Define readiness objective (`/health/live`, `/health/ready`)
+- [x] Add dedicated SLO policy document (`docs/SLO.md`)
+
+### 2) Error Budget Policy
+
+- [x] Define monthly error budget from availability target
+- [x] Define burn-rate based action policy
+- [x] Link budget policy to deployment freeze conditions
+
+### 3) Alert and Incident Policy
+
+- [x] Define page/warn alert thresholds
+- [x] Add operations runbook (`docs/OPERATIONS.md`)
+- [x] Add rollback and incident handling checklist
+
+### 4) Deployment Guardrails
+
+- [x] Add runtime health guard script (`scripts/check_runtime_health.py`)
+- [x] Add SLO policy baseline checker (`scripts/check_slo_policy.py`)
+- [x] Integrate SLO policy check into CI (`docs-contract.yml`)
+
+## Definition of Done (P4-Current)
+
+- Unit/contract tests pass
+- Docs-route contract check passes
+- Schema policy check passes
+- Version consistency check passes
+- SLO policy check passes
 - `docs/CHANGELOG.md` updated
