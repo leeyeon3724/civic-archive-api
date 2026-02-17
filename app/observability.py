@@ -19,6 +19,8 @@ REQUEST_LATENCY = Histogram(
     "HTTP request latency (seconds)",
     ["method", "path"],
 )
+ALLOWED_HTTP_METHOD_LABELS = {"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"}
+MAX_PATH_LABEL_LENGTH = 96
 
 logger = logging.getLogger("civic_archive.api")
 
@@ -29,6 +31,26 @@ def _route_template(request: Request) -> str:
     if route_path:
         return str(route_path)
     return "/_unmatched"
+
+
+def _metric_method_label(method: str | None) -> str:
+    normalized = (method or "").upper()
+    if normalized in ALLOWED_HTTP_METHOD_LABELS:
+        return normalized
+    return "OTHER"
+
+
+def _metric_path_label(request: Request) -> str:
+    path = _route_template(request)
+    if len(path) > MAX_PATH_LABEL_LENGTH:
+        return "/_label_too_long"
+    return path
+
+
+def _metric_status_label(status_code: int) -> str:
+    if 100 <= int(status_code) <= 599:
+        return str(int(status_code))
+    return "000"
 
 
 def register_observability(api: FastAPI) -> None:
@@ -43,15 +65,17 @@ def register_observability(api: FastAPI) -> None:
             response = await call_next(request)
         except Exception as exc:
             elapsed = time.perf_counter() - started
-            path = _route_template(request)
+            method = _metric_method_label(request.method)
+            path = _metric_path_label(request)
             status_code = 500
             if isinstance(exc, RequestValidationError):
                 status_code = 400
             elif isinstance(exc, StarletteHTTPException):
                 status_code = int(exc.status_code)
+            status_label = _metric_status_label(status_code)
 
-            REQUEST_COUNT.labels(request.method, path, str(status_code)).inc()
-            REQUEST_LATENCY.labels(request.method, path).observe(elapsed)
+            REQUEST_COUNT.labels(method, path, status_label).inc()
+            REQUEST_LATENCY.labels(method, path).observe(elapsed)
             log_payload = {
                 "request_id": request_id,
                 "method": request.method,
@@ -73,10 +97,12 @@ def register_observability(api: FastAPI) -> None:
             raise
 
         elapsed = time.perf_counter() - started
-        path = _route_template(request)
+        method = _metric_method_label(request.method)
+        path = _metric_path_label(request)
         status_code = int(response.status_code)
-        REQUEST_COUNT.labels(request.method, path, str(status_code)).inc()
-        REQUEST_LATENCY.labels(request.method, path).observe(elapsed)
+        status_label = _metric_status_label(status_code)
+        REQUEST_COUNT.labels(method, path, status_label).inc()
+        REQUEST_LATENCY.labels(method, path).observe(elapsed)
         response.headers["X-Request-Id"] = request_id
 
         logger.info(

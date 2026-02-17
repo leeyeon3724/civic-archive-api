@@ -32,6 +32,8 @@ class Config(BaseSettings):
     REDIS_URL: str | None = None
     RATE_LIMIT_REDIS_PREFIX: str = "civic_archive:rate_limit"
     RATE_LIMIT_REDIS_WINDOW_SECONDS: int = 65
+    RATE_LIMIT_REDIS_FAILURE_COOLDOWN_SECONDS: int = 5
+    RATE_LIMIT_FAIL_OPEN: bool = True
     CORS_ALLOW_ORIGINS: str = "*"
     CORS_ALLOW_METHODS: str = "GET,POST,DELETE,OPTIONS"
     CORS_ALLOW_HEADERS: str = "*"

@@ -73,12 +73,19 @@ return current
         redis_url: str,
         key_prefix: str,
         window_seconds: int,
+        failure_cooldown_seconds: int,
+        fail_open: bool,
+        monotonic: Callable[[], float] | None = None,
     ) -> None:
         self.requests_per_minute = max(0, requests_per_minute)
         self.key_prefix = key_prefix
         self.window_seconds = max(1, window_seconds)
+        self.failure_cooldown_seconds = max(1, int(failure_cooldown_seconds))
+        self.fail_open = bool(fail_open)
+        self._monotonic = monotonic or time.monotonic
         self._script_sha: str | None = None
         self._client = None
+        self._degraded_until = 0.0
 
         if not self.enabled:
             return
@@ -102,6 +109,9 @@ return current
             return True
         if self._client is None:
             return True
+        now = self._monotonic()
+        if now < self._degraded_until:
+            return self.fail_open
 
         bucket = int(time.time() // 60)
         redis_key = f"{self.key_prefix}:{bucket}:{key}"
@@ -109,10 +119,17 @@ return current
         try:
             current = int(self._eval_counter(redis_key))
         except RedisError:
-            logger.warning("rate_limit_redis_error", extra={"client_key": key})
-            # Fail-open to preserve API availability when Redis is transiently unavailable.
-            return True
+            self._degraded_until = now + float(self.failure_cooldown_seconds)
+            logger.warning(
+                "rate_limit_redis_error",
+                extra={
+                    "fail_open": self.fail_open,
+                    "cooldown_seconds": self.failure_cooldown_seconds,
+                },
+            )
+            return self.fail_open
 
+        self._degraded_until = 0.0
         return current <= self.requests_per_minute
 
     def _eval_counter(self, redis_key: str) -> int:
@@ -145,6 +162,8 @@ def _build_rate_limiter(config):
             redis_url=redis_url,
             key_prefix=config.RATE_LIMIT_REDIS_PREFIX,
             window_seconds=config.RATE_LIMIT_REDIS_WINDOW_SECONDS,
+            failure_cooldown_seconds=config.RATE_LIMIT_REDIS_FAILURE_COOLDOWN_SECONDS,
+            fail_open=config.RATE_LIMIT_FAIL_OPEN,
         )
     if config.rate_limit_backend == "memory":
         return InMemoryRateLimiter(config.RATE_LIMIT_PER_MINUTE)

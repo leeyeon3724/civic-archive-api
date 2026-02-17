@@ -356,13 +356,36 @@ def test_rate_limit_redis_backend_requires_redis_url(make_engine):
             )
 
 
+def test_rate_limit_redis_failure_cooldown_must_be_positive(make_engine):
+    with patch("app.database.create_engine", return_value=make_engine(lambda *_: StubResult())):
+        with pytest.raises(RuntimeError):
+            create_app(
+                Config(
+                    RATE_LIMIT_REDIS_FAILURE_COOLDOWN_SECONDS=0,
+                )
+            )
+
+
 def test_rate_limit_redis_backend_is_usable_with_custom_limiter(make_engine):
     class FakeRedisRateLimiter:
-        def __init__(self, *, requests_per_minute: int, redis_url: str, key_prefix: str, window_seconds: int) -> None:
+        def __init__(
+            self,
+            *,
+            requests_per_minute: int,
+            redis_url: str,
+            key_prefix: str,
+            window_seconds: int,
+            failure_cooldown_seconds: int,
+            fail_open: bool,
+            monotonic=None,
+        ) -> None:
             assert requests_per_minute == 1
             assert redis_url == "redis://localhost:6379/0"
             assert key_prefix == "test-prefix"
             assert window_seconds == 70
+            assert failure_cooldown_seconds == 9
+            assert fail_open is False
+            assert monotonic is None
             self.enabled = True
             self.calls = 0
 
@@ -380,6 +403,8 @@ def test_rate_limit_redis_backend_is_usable_with_custom_limiter(make_engine):
                 REDIS_URL="redis://localhost:6379/0",
                 RATE_LIMIT_REDIS_PREFIX="test-prefix",
                 RATE_LIMIT_REDIS_WINDOW_SECONDS=70,
+                RATE_LIMIT_REDIS_FAILURE_COOLDOWN_SECONDS=9,
+                RATE_LIMIT_FAIL_OPEN=False,
                 RATE_LIMIT_PER_MINUTE=1,
             )
         )

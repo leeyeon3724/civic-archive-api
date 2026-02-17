@@ -50,6 +50,8 @@ def create_app(config=None):
         raise RuntimeError("RATE_LIMIT_BACKEND must be one of: memory, redis.")
     if config.rate_limit_backend == "redis" and not (config.REDIS_URL or "").strip():
         raise RuntimeError("RATE_LIMIT_BACKEND=redis requires REDIS_URL to be set.")
+    if config.RATE_LIMIT_REDIS_FAILURE_COOLDOWN_SECONDS <= 0:
+        raise RuntimeError("RATE_LIMIT_REDIS_FAILURE_COOLDOWN_SECONDS must be greater than 0.")
 
     api.add_middleware(
         CORSMiddleware,

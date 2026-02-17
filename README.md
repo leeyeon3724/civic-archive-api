@@ -50,6 +50,8 @@ Copy-Item .env.example .env
 | `REDIS_URL` | `` | Redis 연결 URL (`RATE_LIMIT_BACKEND=redis`일 때 필수) |
 | `RATE_LIMIT_REDIS_PREFIX` | `civic_archive:rate_limit` | Redis rate limit 키 prefix |
 | `RATE_LIMIT_REDIS_WINDOW_SECONDS` | `65` | Redis 고정 윈도우 TTL(초) |
+| `RATE_LIMIT_REDIS_FAILURE_COOLDOWN_SECONDS` | `5` | Redis 장애 시 재시도 쿨다운(초) |
+| `RATE_LIMIT_FAIL_OPEN` | `1` | Redis 장애 시 요청 허용 여부 (`1` 허용 / `0` 차단) |
 | `CORS_ALLOW_ORIGINS` | `*` | 허용 Origin 목록(쉼표 구분) |
 | `CORS_ALLOW_METHODS` | `GET,POST,DELETE,OPTIONS` | 허용 HTTP 메서드(쉼표 구분) |
 | `CORS_ALLOW_HEADERS` | `*` | 허용 헤더(쉼표 구분) |
@@ -67,6 +69,7 @@ Copy-Item .env.example .env
 - 운영 환경에서는 `REQUIRE_API_KEY=1`, `API_KEY=<secret>` 적용을 권장합니다.
 - `RATE_LIMIT_PER_MINUTE`로 `/api/*` 엔드포인트 요청 제한을 활성화할 수 있습니다.
 - 다중 인스턴스 환경에서는 `RATE_LIMIT_BACKEND=redis`, `REDIS_URL=redis://...` 구성을 권장합니다.
+- Redis 장애 시 동작은 `RATE_LIMIT_FAIL_OPEN`과 `RATE_LIMIT_REDIS_FAILURE_COOLDOWN_SECONDS`로 제어합니다.
 
 ## 마이그레이션
 

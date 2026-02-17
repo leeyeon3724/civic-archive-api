@@ -49,6 +49,8 @@
       REDIS_URL: redis://redis:6379/0
       RATE_LIMIT_REDIS_PREFIX: civic_archive:rate_limit
       RATE_LIMIT_REDIS_WINDOW_SECONDS: "65"
+      RATE_LIMIT_REDIS_FAILURE_COOLDOWN_SECONDS: "5"
+      RATE_LIMIT_FAIL_OPEN: "1"
       ALLOWED_HOSTS: "*"
       PORT: 8000
     ports:

@@ -117,6 +117,9 @@ class ClientAdapter:
     def delete(self, *args, **kwargs):
         return ResponseAdapter(self._client.delete(*args, **self._normalize_kwargs(kwargs)))
 
+    def request(self, *args, **kwargs):
+        return ResponseAdapter(self._client.request(*args, **self._normalize_kwargs(kwargs)))
+
 
 @pytest.fixture(scope="session")
 def app_instance():

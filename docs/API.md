@@ -34,6 +34,8 @@
 - 인증이 활성화된 경우(`REQUIRE_API_KEY=1`) `/api/*` 요청에 `X-API-Key` 헤더 필수
 - 요청 제한이 활성화된 경우(`RATE_LIMIT_PER_MINUTE>0`) IP 기준 `429 (RATE_LIMITED)` 응답 가능
   - 백엔드: `RATE_LIMIT_BACKEND=memory|redis` (`redis` 사용 시 `REDIS_URL` 필요)
+  - Redis 장애 시 fallback 정책: `RATE_LIMIT_FAIL_OPEN` (`1`=허용, `0`=차단)
+  - Redis 장애 재시도 쿨다운: `RATE_LIMIT_REDIS_FAILURE_COOLDOWN_SECONDS`
 
 ## 유틸리티 엔드포인트
 

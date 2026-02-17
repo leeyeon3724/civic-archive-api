@@ -44,7 +44,8 @@ main.py                  # uvicorn 실행 진입점
 alembic.ini
 migrations/
 └── versions/
-    └── 35f43b134803_initial_schema.py
+    ├── 35f43b134803_initial_schema.py
+    └── 0df9d6f13c5a_add_segments_dedupe_hash.py
 scripts/
 ├── bootstrap_db.py      # alembic upgrade head 실행
 ├── benchmark_queries.py # 대표 조회 쿼리 성능 회귀 체크
@@ -71,7 +72,7 @@ tests/
 |--------|------|-----------|-----------|
 | `news_articles` | 뉴스/기사 | `url` UNIQUE + upsert | title, url, published_at, content, keywords(JSONB) |
 | `council_minutes` | 의회 회의록 | `url` UNIQUE + upsert | council, url, meeting_date, content, tag/attendee/agenda(JSONB) |
-| `council_speech_segments` | 발언 단락 | insert-only | council, meeting_date, content, importance, questioner/answerer(JSONB) |
+| `council_speech_segments` | 발언 단락 | `dedupe_hash` UNIQUE + idempotent insert | council, meeting_date, content, importance, questioner/answerer(JSONB) |
 
 ## 앱 초기화 흐름
 
@@ -105,9 +106,10 @@ ASGI 엔트리포인트: `app.main:app`
 - 목록 total: `COUNT(*)` 별도 쿼리
 - 요청/응답 검증: FastAPI + Pydantic 모델 기반으로 OpenAPI 자동 문서화
 - 에러 표준화: `code/message/error/request_id/details` 단일 포맷
-- 관측성: request-id 미들웨어, 구조화 로그, `/metrics` 메트릭 (라우트 미매칭은 `/_unmatched`로 라벨 고정)
+- 관측성: request-id 미들웨어, 구조화 로그, `/metrics` 메트릭 (라우트 미매칭은 `/_unmatched`, 알 수 없는 HTTP method는 `OTHER` 라벨로 고정)
 - 보안 기본선: API key 선택적 강제(`REQUIRE_API_KEY`), IP rate-limit(`RATE_LIMIT_PER_MINUTE`)
 - 분산 rate-limit: `RATE_LIMIT_BACKEND=redis`, `REDIS_URL`로 멀티 인스턴스 환경 지원
+- Redis limiter 안정화: 장애 시 쿨다운(`RATE_LIMIT_REDIS_FAILURE_COOLDOWN_SECONDS`) + fallback(`RATE_LIMIT_FAIL_OPEN`) 지원
 - 성능 회귀 체크: `scripts/benchmark_queries.py` + avg/p95 threshold 검사
 - 문서-코드 정합성: `scripts/check_docs_routes.py` + CI
 - 버전 정합성: `scripts/check_version_consistency.py` + CI
