@@ -16,7 +16,7 @@
 
 ```text
 app/
-├── __init__.py          # create_app() + 공통 예외 처리
+├── __init__.py          # create_app() 조합/오케스트레이션 엔트리포인트
 ├── main.py              # ASGI 엔트리포인트(app 인스턴스 export)
 ├── version.py           # 앱 버전 단일 소스(APP_VERSION)
 ├── config.py            # 환경변수 -> DATABASE_URL
@@ -25,6 +25,11 @@ app/
 ├── logging_config.py    # JSON 구조화 로깅 설정
 ├── observability.py     # request-id, 요청 로깅, Prometheus 메트릭
 ├── security.py          # API key 검증 + rate limit 의존성
+├── bootstrap/           # 앱 부트스트랩 경계(검증/미들웨어/시스템 라우트/예외 핸들러)
+│   ├── validation.py
+│   ├── middleware.py
+│   ├── system_routes.py
+│   └── exception_handlers.py
 ├── schemas.py           # Pydantic 요청/응답 모델
 ├── utils.py             # 파서/페이로드 검증 공통 함수
 ├── services/            # 입력 정규화/검증 레이어
@@ -83,15 +88,15 @@ tests/
 ```text
 create_app()
   -> Config() 로드
-  -> BOOTSTRAP_TABLES_ON_STARTUP=1 이면 즉시 실패(정책 위반 방지)
-  -> CORS/TrustedHost 미들웨어 등록
-  -> request_size_guard 미들웨어(`/api/*` write payload 크기 상한)
+  -> validate_startup_config()             # 환경/보안/운영 가드 검증
+  -> register_core_middleware()            # CORS/TrustedHost + request_size_guard
   -> configure_logging()                # JSON 로그 포맷
   -> init_db(DATABASE_URL + pool/timeout runtime tuning)
   -> API 보호 의존성(api-key/rate-limit) 구성
   -> register_observability()           # X-Request-Id + metrics + request logging
-  -> register_routes(dependencies=...)  # APIRouter 등록
-  -> 예외 핸들러 등록 (표준 에러 스키마)
+  -> register_domain_routes(...)        # APIRouter 등록
+  -> register_system_routes(...)        # /health, /api/echo 등 시스템 라우트 등록
+  -> register_exception_handlers(...)   # 표준 에러 스키마 핸들러 등록
 ```
 
 ASGI 엔트리포인트: `app.main:app`

@@ -29,6 +29,7 @@
 - 통합 테스트 범위 확장 (`tests/test_integration_postgres.py`: JWT runtime 경로, payload guard `413`, metrics label 검증)
 - e2e 도달성 검사 기반 skip 가드 추가 (`tests/test_e2e.py`)
 - P7 엔지니어링 품질 강화 백로그 추가 (`docs/REFACTOR_BACKLOG.md`)
+- P8 아키텍처 분해 백로그 추가 (`docs/REFACTOR_BACKLOG.md`)
 
 ### 변경됨
 
@@ -53,6 +54,8 @@
 - `GET /api/news`의 `to` 날짜 경계 필터를 일 단위 inclusive semantics로 조정
 - CI 품질 게이트에 `ruff` 린트 및 `pytest --cov --cov-fail-under=85` 커버리지 하한을 추가
 - 기여/운영/SLO 문서의 검증 명령을 lint/coverage 게이트 기준으로 정합화
+- `create_app()` 책임을 bootstrap 모듈(`validation`, `middleware`, `system_routes`, `exception_handlers`)로 분해
+- 아키텍처 문서에 bootstrap 경계와 초기화 조합 흐름을 반영
 
 ### 수정됨
 

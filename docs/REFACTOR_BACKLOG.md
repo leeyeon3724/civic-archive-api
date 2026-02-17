@@ -15,7 +15,8 @@
 | P4 | SLO and observability ops | SLI/SLO, error budget policy, alert policy | Completed |
 | P5 | Performance and scalability baseline | DB pool/runtime timeout tuning, query latency guardrails | Completed |
 | P6 | Runtime verification hardening | streaming request guard, observability label accuracy, integration/e2e reliability | Completed |
-| P7 | Engineering quality hardening | config safety, query correctness, quality gates uplift | In Progress |
+| P7 | Engineering quality hardening | config safety, query correctness, quality gates uplift | Completed |
+| P8 | Architecture decomposition | create_app modularization, bootstrap boundaries, DI prep | In Progress |
 
 ## P1 Backlog (Current Scope)
 
@@ -255,4 +256,35 @@
 - SLO policy check passes
 - Lint gate (`ruff`) passes
 - Coverage gate (`--cov-fail-under`) passes
+- `docs/CHANGELOG.md` updated
+
+## P8 Backlog (Current Scope)
+
+### 1) create_app Decomposition
+
+- [x] Extract startup config validation into `app/bootstrap/validation.py`
+- [x] Extract core middleware registration into `app/bootstrap/middleware.py`
+- [x] Extract system route registration into `app/bootstrap/system_routes.py`
+- [x] Extract exception handler registration into `app/bootstrap/exception_handlers.py`
+- [x] Keep `app.create_app()` as composition/orchestration entrypoint only
+
+### 2) Bootstrap Boundary Contracts
+
+- [ ] Add dedicated tests for each bootstrap module (validation/middleware/system-routes/handlers)
+- [ ] Define explicit contract for dependency injection surface between bootstrap and route/service layers
+
+### 3) DI Migration Preparation
+
+- [ ] Introduce session provider abstraction replacing direct `database.engine` usage in repositories
+- [ ] Prepare phased migration plan: global engine -> provider -> repository injection
+
+## Definition of Done (P8-Current)
+
+- Unit/contract tests pass
+- Integration tests pass (`RUN_INTEGRATION=1`)
+- Docs-route contract check passes
+- Schema policy check passes
+- Version consistency check passes
+- SLO policy check passes
+- `create_app()` responsibilities are split across bootstrap modules
 - `docs/CHANGELOG.md` updated
