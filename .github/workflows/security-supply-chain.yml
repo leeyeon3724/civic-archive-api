@@ -62,4 +62,4 @@ jobs:
 
       - name: Run static security scan (Bandit)
         run: |
-          bandit -q -r app scripts -ll -s B608
+          bandit -q -r app scripts -ll
