@@ -69,3 +69,7 @@ PR 본문에 아래 항목을 포함합니다.
 ## 릴리스
 
 버전/태그 정책은 `docs/VERSIONING.md`를 따릅니다.
+
+릴리스 태그 검증 권장 명령:
+
+- `EXPECTED_VERSION=<X.Y.Z> python scripts/check_version_consistency.py`

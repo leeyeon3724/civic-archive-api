@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import os
 import re
 import sys
 from pathlib import Path
@@ -11,10 +12,12 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 VERSION_FILE = PROJECT_ROOT / "app" / "version.py"
 APP_INIT_FILE = PROJECT_ROOT / "app" / "__init__.py"
 CHANGELOG_FILE = PROJECT_ROOT / "docs" / "CHANGELOG.md"
+RELEASE_WORKFLOW_FILE = PROJECT_ROOT / ".github" / "workflows" / "release-tag.yml"
 
 SEMVER_RE = re.compile(r"^\d+\.\d+\.\d+$")
 VERSION_ASSIGN_RE = re.compile(r'^\s*APP_VERSION\s*=\s*"([^"]+)"\s*$', re.MULTILINE)
 HARDCODED_FASTAPI_VERSION_RE = re.compile(r'version\s*=\s*"[^"]+"')
+CHANGELOG_RELEASE_RE = re.compile(r"^## \[(\d+\.\d+\.\d+)\]", re.MULTILINE)
 
 
 def read_text(path: Path) -> str:
@@ -39,8 +42,14 @@ def main() -> int:
         return 1
 
     errors: list[str] = []
+    expected_version = (os.getenv("EXPECTED_VERSION") or "").strip()
     if not SEMVER_RE.match(version):
         errors.append(f"APP_VERSION must be SemVer (X.Y.Z): {version}")
+    if expected_version:
+        if not SEMVER_RE.match(expected_version):
+            errors.append(f"EXPECTED_VERSION must be SemVer (X.Y.Z): {expected_version}")
+        elif expected_version != version:
+            errors.append(f"APP_VERSION ({version}) must match EXPECTED_VERSION ({expected_version})")
 
     if not APP_INIT_FILE.exists():
         errors.append(f"Missing app init file: {APP_INIT_FILE}")
@@ -57,8 +66,29 @@ def main() -> int:
         errors.append(f"Missing changelog file: {CHANGELOG_FILE}")
     else:
         changelog = read_text(CHANGELOG_FILE)
+        if "## [Unreleased]" not in changelog:
+            errors.append("docs/CHANGELOG.md must contain section: ## [Unreleased]")
         if f"## [{version}]" not in changelog:
             errors.append(f"docs/CHANGELOG.md must contain section: ## [{version}]")
+        released_versions = CHANGELOG_RELEASE_RE.findall(changelog)
+        if released_versions:
+            latest_released = released_versions[0]
+            if latest_released != version:
+                errors.append(
+                    f"Latest released changelog section must match APP_VERSION. "
+                    f"Found [{latest_released}], expected [{version}]"
+                )
+        else:
+            errors.append("docs/CHANGELOG.md must contain at least one released section: ## [X.Y.Z]")
+
+    if not RELEASE_WORKFLOW_FILE.exists():
+        errors.append(f"Missing release workflow file: {RELEASE_WORKFLOW_FILE}")
+    else:
+        release_workflow = read_text(RELEASE_WORKFLOW_FILE)
+        if "check_version_consistency.py" not in release_workflow:
+            errors.append(
+                ".github/workflows/release-tag.yml must run scripts/check_version_consistency.py"
+            )
 
     if errors:
         print("Version consistency check failed.")

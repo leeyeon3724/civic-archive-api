@@ -14,6 +14,7 @@
 - 버전 단일 소스/변경이력 정합성 자동 검사 스크립트(`scripts/check_version_consistency.py`) 추가
 - 운영 헬스 분리를 위한 `GET /health/live`, `GET /health/ready` 엔드포인트 추가
 - `council_speech_segments.dedupe_hash` 및 고유 인덱스(중복 삽입 방지) 마이그레이션 추가
+- Redis rate limiter 운영 강화 옵션 추가 (`RATE_LIMIT_FAIL_OPEN`, `RATE_LIMIT_REDIS_FAILURE_COOLDOWN_SECONDS`)
 
 ### 변경됨
 
@@ -21,6 +22,8 @@
 - 라우트 계층의 저장소 직접 호출을 제거하고 `service` 오케스트레이션 경유 구조로 책임 경계를 정리함
 - metrics path 라벨 cardinality 보호를 위해 라우트 미매칭 요청을 `/_unmatched`로 집계
 - `/api/segments` 삽입 동작을 정규화 payload 기반 idempotent insert로 변경 (`ON CONFLICT DO NOTHING`)
+- metrics cardinality 보호 강화를 위해 알 수 없는 HTTP method 라벨을 `OTHER`로 정규화
+- 버전 정합성 검사 강화: changelog 구조 검증(`Unreleased`, 최신 릴리스 섹션) 및 release-tag 워크플로우 연동
 
 ### 수정됨
 

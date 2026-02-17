@@ -9,8 +9,8 @@
 
 | Priority | Theme | Tasks | Status |
 |----------|-------|-------|--------|
-| P1 | Operational baseline and correctness | readiness (DB/Redis), segments idempotency, mojibake cleanup | In Progress |
-| P2 | Data and query performance | FTS/trigram indexes, keyset pagination, bulk write optimization | Pending |
+| P1 | Operational baseline and correctness | readiness (DB/Redis), segments idempotency, mojibake cleanup | Completed |
+| P2 | Operations hardening | Redis rate limiter hardening, metrics cardinality protection, version policy automation | In Progress |
 | P3 | Security and operations hardening | JWT/RBAC, trusted proxy chain validation, SBOM/vulnerability scan | Pending |
 | P4 | SLO and observability ops | SLI/SLO, error budget policy, alert policy | Pending |
 
@@ -39,6 +39,37 @@
 
 - Unit/contract tests pass
 - Documentation-route contract check passes
+- Schema policy check passes
+- Version consistency check passes
+- `docs/CHANGELOG.md` updated
+
+## P2 Backlog (Current Scope)
+
+### 1) Redis Rate Limiter Hardening
+
+- [x] Add Redis failure cooldown to avoid per-request Redis retry storms
+- [x] Add configurable fallback mode (`RATE_LIMIT_FAIL_OPEN`)
+- [x] Keep readiness behavior explicit for Redis backend health
+- [x] Add regression tests for fail-open/fail-closed cooldown behavior
+
+### 2) Metrics Cardinality Protection Deepening
+
+- [x] Normalize unknown HTTP methods to a bounded label (`OTHER`)
+- [x] Keep path labels bounded (`/_unmatched`, max-length guard)
+- [x] Normalize invalid status labels to bounded fallback (`000`)
+- [x] Add regression test for method-label cardinality guard
+
+### 3) Version Single-Source Verification Hardening
+
+- [x] Extend `check_version_consistency.py` with changelog structure checks
+- [x] Add `EXPECTED_VERSION` support for release-tag validation
+- [x] Enforce release workflow to run version consistency script
+- [ ] Add dedicated script unit tests (deferred to P3 quality pass)
+
+## Definition of Done (P2)
+
+- Unit/contract tests pass
+- Docs-route contract check passes
 - Schema policy check passes
 - Version consistency check passes
 - `docs/CHANGELOG.md` updated

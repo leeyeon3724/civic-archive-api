@@ -21,6 +21,11 @@ jobs:
             exit 1
           fi
 
+      - name: Validate app version consistency
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          EXPECTED_VERSION="$VERSION" python3 scripts/check_version_consistency.py
+
       - name: Validate changelog entry
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
