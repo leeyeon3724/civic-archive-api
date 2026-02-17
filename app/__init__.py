@@ -51,7 +51,7 @@ def create_app(config: Config | None = None) -> FastAPI:
     register_core_middleware(api, config)
 
     db_engine = init_db(
-        config.DATABASE_URL,
+        config.database_url,
         pool_size=config.DB_POOL_SIZE,
         max_overflow=config.DB_MAX_OVERFLOW,
         pool_timeout_seconds=config.DB_POOL_TIMEOUT_SECONDS,

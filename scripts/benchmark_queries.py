@@ -54,8 +54,8 @@ def _load_app_dependencies() -> dict[str, Any]:
     if str(PROJECT_ROOT) not in sys.path:
         sys.path.insert(0, str(PROJECT_ROOT))
 
-    from app.config import Config as config_class
-    from app.database import init_db as init_db_fn
+    from app.config import Config
+    from app.database import init_db
     from app.repositories.minutes_repository import list_minutes as list_minutes_fn, upsert_minutes as upsert_minutes_fn
     from app.repositories.news_repository import list_articles as list_articles_fn, upsert_articles as upsert_articles_fn
     from app.repositories.segments_repository import (
@@ -64,8 +64,8 @@ def _load_app_dependencies() -> dict[str, Any]:
     )
 
     return {
-        "init_db": init_db_fn,
-        "Config": config_class,
+        "init_db": init_db,
+        "Config": Config,
         "list_articles": list_articles_fn,
         "upsert_articles": upsert_articles_fn,
         "list_minutes": list_minutes_fn,
@@ -320,7 +320,7 @@ def main() -> int:
     init_db_fn = dependencies["init_db"]
 
     config = config_class()
-    db_engine = init_db_fn(config.DATABASE_URL)
+    db_engine = init_db_fn(config.database_url)
     connection_provider = db_engine.begin
     _seed_data(
         connection_provider=connection_provider,

@@ -158,10 +158,12 @@ def test_validation_error_returns_standard_error_with_details(client):
 
 def test_save_news_accepts_object_and_list(client, override_dependency):
     class FakeNewsService:
-        def normalize_article(self, item):
+        @staticmethod
+        def normalize_article(item):
             return item
 
-        def upsert_articles(self, items):
+        @staticmethod
+        def upsert_articles(items):
             return (len(items), 0)
 
     override_dependency(get_news_service, lambda: FakeNewsService())
@@ -330,7 +332,7 @@ def test_database_url_preserves_special_character_credentials():
         POSTGRES_DB="archive",
     )
 
-    parsed = make_url(config.DATABASE_URL)
+    parsed = make_url(config.database_url)
     assert parsed.username == "app-user"
     assert parsed.password == "pa:ss@word"
     assert parsed.host == "db.internal"

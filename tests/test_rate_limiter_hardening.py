@@ -6,7 +6,8 @@ def test_redis_rate_limiter_fail_open_enters_cooldown(monkeypatch):
         def __init__(self) -> None:
             self.calls = 0
 
-        def script_load(self, _script):
+        @staticmethod
+        def script_load(_script):
             return "sha"
 
         def evalsha(self, _sha, _num_keys, _redis_key, _ttl):
@@ -42,7 +43,8 @@ def test_redis_rate_limiter_fail_closed_enters_cooldown(monkeypatch):
         def __init__(self) -> None:
             self.calls = 0
 
-        def script_load(self, _script):
+        @staticmethod
+        def script_load(_script):
             return "sha"
 
         def evalsha(self, _sha, _num_keys, _redis_key, _ttl):

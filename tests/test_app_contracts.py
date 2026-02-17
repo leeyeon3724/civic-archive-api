@@ -70,10 +70,12 @@ def test_upsert_minutes_counts_insert_and_update(minutes_module, make_connection
 
 def test_save_minutes_accepts_object_and_list(client, override_dependency):
     class FakeMinutesService:
-        def normalize_minutes(self, item):
+        @staticmethod
+        def normalize_minutes(item):
             return item
 
-        def upsert_minutes(self, items):
+        @staticmethod
+        def upsert_minutes(items):
             return (len(items), 0)
 
     override_dependency(get_minutes_service, lambda: FakeMinutesService())
@@ -208,10 +210,12 @@ def test_delete_minutes_success_and_not_found(client, use_stub_connection_provid
 
 def test_save_segments_accepts_object_and_list(client, override_dependency):
     class FakeSegmentsService:
-        def normalize_segment(self, item):
+        @staticmethod
+        def normalize_segment(item):
             return item
 
-        def insert_segments(self, items):
+        @staticmethod
+        def insert_segments(items):
             return len(items)
 
     override_dependency(get_segments_service, lambda: FakeSegmentsService())

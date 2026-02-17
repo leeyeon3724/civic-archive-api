@@ -19,7 +19,7 @@ app/
 ├── __init__.py          # create_app() 조합/오케스트레이션 엔트리포인트
 ├── main.py              # ASGI 엔트리포인트(app 인스턴스 export)
 ├── version.py           # 앱 버전 단일 소스(APP_VERSION)
-├── config.py            # 환경변수 -> DATABASE_URL
+├── config.py            # 환경변수 -> database_url
 ├── database.py          # init_db() 전용 (런타임 DDL 없음)
 ├── errors.py            # 표준 에러 payload/HTTPException 헬퍼
 ├── logging_config.py    # JSON 구조화 로깅 설정
@@ -101,7 +101,7 @@ create_app()
   -> validate_startup_config()             # 환경/보안/운영 가드 검증
   -> register_core_middleware()            # CORS/TrustedHost + request_size_guard
   -> configure_logging()                # JSON 로그 포맷
-  -> init_db(DATABASE_URL + pool/timeout runtime tuning)
+  -> init_db(database_url + pool/timeout runtime tuning)
   -> app.state.db_engine / app.state.connection_provider 설정
   -> API 보호 의존성(api-key/rate-limit) 구성
   -> register_observability()           # X-Request-Id + metrics + request logging

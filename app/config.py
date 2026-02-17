@@ -63,7 +63,7 @@ class Config(BaseSettings):
 
     @computed_field  # type: ignore[prop-decorator]
     @property
-    def DATABASE_URL(self) -> str:
+    def database_url(self) -> str:
         return URL.create(
             "postgresql+psycopg",
             username=self.POSTGRES_USER,
@@ -72,6 +72,11 @@ class Config(BaseSettings):
             port=int(self.POSTGRES_PORT),
             database=self.POSTGRES_DB,
         ).render_as_string(hide_password=False)
+
+    def _database_url_compat(self) -> str:
+        return self.database_url
+
+    DATABASE_URL = property(_database_url_compat)
 
     @staticmethod
     def _parse_csv(value: str) -> List[str]:

@@ -90,6 +90,9 @@
 - 저장소 루트에 `.editorconfig`를 추가해 UTF-8/LF 인코딩 정책을 명시하고 편집기별 인코딩 편차를 방지
 - 개발 의존성의 `pytest`를 `9.0.2`로 갱신하고 런타임 의존성의 `PyJWT` 최소 버전을 `2.11`로 상향
 - Dockerfile에서 `PORT`를 `ARG`/`ENV`로 일원화하고 `EXPOSE`/`CMD` 경로에서 동일 변수를 사용하도록 정리
+- `Config`의 DB URL 계산 프로퍼티를 `database_url`로 정리하고 앱/마이그레이션/벤치마크 호출부를 일관되게 갱신
+- 테스트 더블 메서드 중 인스턴스 상태를 사용하지 않는 항목을 `@staticmethod`로 명시해 정적 분석 경고를 제거
+- 벤치마크 스크립트의 CamelCase import alias(`Config as config_class`)를 제거해 PEP8 naming 경고를 해소
 
 ### 수정됨
 
