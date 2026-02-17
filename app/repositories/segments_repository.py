@@ -5,11 +5,15 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from sqlalchemy import text
 
-from app import database
 from app.repositories.common import build_where_clause, execute_paginated_query
+from app.repositories.session_provider import ConnectionProvider, open_connection_scope
 
 
-def insert_segments(items: List[Dict[str, Any]]) -> int:
+def insert_segments(
+    items: List[Dict[str, Any]],
+    *,
+    connection_provider: ConnectionProvider | None = None,
+) -> int:
     sql = text(
         """
         INSERT INTO council_speech_segments
@@ -26,7 +30,7 @@ def insert_segments(items: List[Dict[str, Any]]) -> int:
     )
 
     inserted = 0
-    with database.engine.begin() as conn:
+    with open_connection_scope(connection_provider) as conn:
         for segment in items:
             params = {
                 "council": segment.get("council"),
@@ -69,6 +73,7 @@ def list_segments(
     date_to: Optional[str],
     page: int,
     size: int,
+    connection_provider: ConnectionProvider | None = None,
 ) -> Tuple[List[Dict[str, Any]], int]:
     where = []
     params: Dict[str, Any] = {}
@@ -145,10 +150,21 @@ def list_segments(
         {where_sql}
         """
 
-    return execute_paginated_query(list_sql=list_sql, count_sql=count_sql, params=params, page=page, size=size)
+    return execute_paginated_query(
+        list_sql=list_sql,
+        count_sql=count_sql,
+        params=params,
+        page=page,
+        size=size,
+        connection_provider=connection_provider,
+    )
 
 
-def get_segment(item_id: int) -> Optional[Dict[str, Any]]:
+def get_segment(
+    item_id: int,
+    *,
+    connection_provider: ConnectionProvider | None = None,
+) -> Optional[Dict[str, Any]]:
     sql = text(
         """
         SELECT id, council, committee, "session",
@@ -162,14 +178,18 @@ def get_segment(item_id: int) -> Optional[Dict[str, Any]]:
         """
     )
 
-    with database.engine.begin() as conn:
+    with open_connection_scope(connection_provider) as conn:
         row = conn.execute(sql, {"id": item_id}).mappings().first()
 
     return dict(row) if row else None
 
 
-def delete_segment(item_id: int) -> bool:
-    with database.engine.begin() as conn:
+def delete_segment(
+    item_id: int,
+    *,
+    connection_provider: ConnectionProvider | None = None,
+) -> bool:
+    with open_connection_scope(connection_provider) as conn:
         result = conn.execute(text("DELETE FROM council_speech_segments WHERE id=:id"), {"id": item_id})
 
     return result.rowcount > 0

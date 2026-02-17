@@ -4,7 +4,7 @@ from typing import Any, Dict, Tuple
 
 from sqlalchemy import text
 
-from app import database
+from app.repositories.session_provider import ConnectionProvider, open_connection_scope
 
 
 def accumulate_upsert_result(result, *, inserted: int, updated: int) -> Tuple[int, int]:
@@ -41,8 +41,9 @@ def execute_paginated_query(
     params: Dict[str, Any],
     page: int,
     size: int,
+    connection_provider: ConnectionProvider | None = None,
 ) -> Tuple[list[dict[str, Any]], int]:
-    with database.engine.begin() as conn:
+    with open_connection_scope(connection_provider) as conn:
         rows = conn.execute(
             text(list_sql),
             {**params, "limit": size, "offset": (page - 1) * size},

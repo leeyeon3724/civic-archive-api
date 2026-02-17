@@ -5,11 +5,15 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from sqlalchemy import text
 
-from app import database
 from app.repositories.common import accumulate_upsert_result, build_where_clause, execute_paginated_query
+from app.repositories.session_provider import ConnectionProvider, open_connection_scope
 
 
-def upsert_minutes(items: List[Dict[str, Any]]) -> Tuple[int, int]:
+def upsert_minutes(
+    items: List[Dict[str, Any]],
+    *,
+    connection_provider: ConnectionProvider | None = None,
+) -> Tuple[int, int]:
     inserted = 0
     updated = 0
 
@@ -36,7 +40,7 @@ def upsert_minutes(items: List[Dict[str, Any]]) -> Tuple[int, int]:
         """
     )
 
-    with database.engine.begin() as conn:
+    with open_connection_scope(connection_provider) as conn:
         for minute in items:
             params = {
                 "council": minute.get("council"),
@@ -68,6 +72,7 @@ def list_minutes(
     date_to: Optional[str],
     page: int,
     size: int,
+    connection_provider: ConnectionProvider | None = None,
 ) -> Tuple[List[Dict[str, Any]], int]:
     where = []
     params: Dict[str, Any] = {}
@@ -124,10 +129,21 @@ def list_minutes(
         {where_sql}
         """
 
-    return execute_paginated_query(list_sql=list_sql, count_sql=count_sql, params=params, page=page, size=size)
+    return execute_paginated_query(
+        list_sql=list_sql,
+        count_sql=count_sql,
+        params=params,
+        page=page,
+        size=size,
+        connection_provider=connection_provider,
+    )
 
 
-def get_minutes(item_id: int) -> Optional[Dict[str, Any]]:
+def get_minutes(
+    item_id: int,
+    *,
+    connection_provider: ConnectionProvider | None = None,
+) -> Optional[Dict[str, Any]]:
     sql = text(
         """
         SELECT id, council, committee, "session", meeting_no_combined AS meeting_no,
@@ -137,14 +153,18 @@ def get_minutes(item_id: int) -> Optional[Dict[str, Any]]:
         """
     )
 
-    with database.engine.begin() as conn:
+    with open_connection_scope(connection_provider) as conn:
         row = conn.execute(sql, {"id": item_id}).mappings().first()
 
     return dict(row) if row else None
 
 
-def delete_minutes(item_id: int) -> bool:
-    with database.engine.begin() as conn:
+def delete_minutes(
+    item_id: int,
+    *,
+    connection_provider: ConnectionProvider | None = None,
+) -> bool:
+    with open_connection_scope(connection_provider) as conn:
         result = conn.execute(text("DELETE FROM council_minutes WHERE id=:id"), {"id": item_id})
 
     return result.rowcount > 0

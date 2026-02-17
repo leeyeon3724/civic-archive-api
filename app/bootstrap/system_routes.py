@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-from typing import Any, Callable
-
 from fastapi import Body, FastAPI, Request
 from fastapi.responses import JSONResponse, PlainTextResponse
 from sqlalchemy import text
 
 import app.database as database
+from app.bootstrap.contracts import ProtectedDependencies, RateLimitHealthCheck
 from app.schemas import EchoResponse, ErrorResponse, HealthResponse, ReadinessCheck, ReadinessResponse
 
 
@@ -14,8 +13,8 @@ def register_system_routes(
     api: FastAPI,
     *,
     config,
-    protected_dependencies: list[Any],
-    rate_limit_health_check: Callable[[], tuple[bool, str | None]],
+    protected_dependencies: ProtectedDependencies,
+    rate_limit_health_check: RateLimitHealthCheck,
 ) -> None:
     def _db_ready() -> tuple[bool, str | None]:
         if database.engine is None:
@@ -83,4 +82,3 @@ def register_system_routes(
         if data is None:
             data = {}
         return EchoResponse(you_sent=data)
-
