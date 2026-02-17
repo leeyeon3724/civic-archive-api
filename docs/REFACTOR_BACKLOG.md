@@ -14,6 +14,7 @@
 | P3 | Security and operations hardening | JWT/RBAC, trusted proxy chain validation, SBOM/vulnerability scan | Completed |
 | P4 | SLO and observability ops | SLI/SLO, error budget policy, alert policy | Completed |
 | P5 | Performance and scalability baseline | DB pool/runtime timeout tuning, query latency guardrails | Completed |
+| P6 | Runtime verification hardening | streaming request guard, observability label accuracy, integration/e2e reliability | In Progress |
 
 ## P1 Backlog (Current Scope)
 
@@ -178,3 +179,39 @@
 ## Deferred Cross-Cutting Backlog
 
 - Add dedicated unit tests for remaining policy scripts (including `check_version_consistency.py`)
+
+## P6 Backlog (Current Scope)
+
+### 1) Streaming Request Guard Hardening
+
+- [ ] Refactor request-size guard to avoid preloading full request body in middleware
+- [ ] Enforce payload limit with streamed chunk accumulation and early abort (`413`)
+- [ ] Add regression tests for chunked/stream-like oversized payloads
+
+### 2) Observability Label Accuracy
+
+- [ ] Resolve route-template labels for middleware early-return responses
+- [ ] Prevent `/_unmatched` overuse for known routes under pre-route guard failures
+- [ ] Add regression tests for metrics labels on payload-guard `413` responses
+
+### 3) Integration Coverage Expansion (Security/Ops Paths)
+
+- [ ] Add integration tests for runtime JWT authorization path (unauthorized/forbidden/authorized)
+- [ ] Add integration tests for payload guard behavior (`413` + standard error shape)
+- [ ] Add integration test for metrics label correctness on guarded failures
+
+### 4) E2E Reliability Improvement
+
+- [ ] Improve e2e fixture to skip gracefully when target server is unreachable
+- [ ] Keep explicit base-url targeting for live-server validation
+- [ ] Prevent false-negative CI/local failures caused by missing live target
+
+## Definition of Done (P6-In Progress)
+
+- Unit/contract tests pass
+- Integration tests pass (`RUN_INTEGRATION=1`)
+- Docs-route contract check passes
+- Schema policy check passes
+- Version consistency check passes
+- SLO policy check passes
+- `docs/CHANGELOG.md` updated

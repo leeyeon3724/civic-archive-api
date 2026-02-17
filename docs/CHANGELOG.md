@@ -24,6 +24,7 @@
 - 성능 정책 문서 추가 (`docs/PERFORMANCE.md`: endpoint latency budget, benchmark profile)
 - ingest/load 안전 가드 옵션 추가 (`INGEST_MAX_BATCH_ITEMS`, `MAX_REQUEST_BODY_BYTES`)
 - 커밋 메시지 정책 검사 스크립트/로컬 훅 설치 스크립트 추가 (`scripts/check_commit_messages.py`, `scripts/install_git_hooks.ps1`)
+- P6 리팩토링 백로그 추가 (`streaming guard`, `metrics label accuracy`, `integration/e2e reliability`)
 
 ### 변경됨
 
