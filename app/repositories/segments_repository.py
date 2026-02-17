@@ -15,12 +15,13 @@ def insert_segments(items: List[Dict[str, Any]]) -> int:
         INSERT INTO council_speech_segments
           (council, committee, "session", meeting_no, meeting_no_combined, meeting_date,
            content, summary, subject, tag, importance, moderator, questioner, answerer,
-           party, constituency, department)
+           party, constituency, department, dedupe_hash)
         VALUES
           (:council, :committee, :session, :meeting_no, :meeting_no_combined, :meeting_date,
            :content, :summary, :subject, CAST(:tag AS jsonb), :importance,
            CAST(:moderator AS jsonb), CAST(:questioner AS jsonb), CAST(:answerer AS jsonb),
-           :party, :constituency, :department)
+           :party, :constituency, :department, :dedupe_hash)
+        ON CONFLICT (dedupe_hash) DO NOTHING
         """
     )
 
@@ -45,9 +46,10 @@ def insert_segments(items: List[Dict[str, Any]]) -> int:
                 "party": segment.get("party"),
                 "constituency": segment.get("constituency"),
                 "department": segment.get("department"),
+                "dedupe_hash": segment.get("dedupe_hash"),
             }
-            conn.execute(sql, params)
-            inserted += 1
+            result = conn.execute(sql, params)
+            inserted += max(0, int(result.rowcount or 0))
 
     return inserted
 

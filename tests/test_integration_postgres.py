@@ -103,6 +103,10 @@ def test_segments_insert_and_filter(integration_client):
     assert saved.status_code == 201
     assert saved.json() == {"inserted": 1}
 
+    duplicate = integration_client.post("/api/segments", json=payload)
+    assert duplicate.status_code == 201
+    assert duplicate.json() == {"inserted": 0}
+
     listed = integration_client.get("/api/segments", params={"importance": 2, "party": "party-a"})
     assert listed.status_code == 200
     assert listed.json()["total"] == 1

@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import hashlib
+import json
+from datetime import date, datetime
 from typing import Any
 
 from app.repositories.segments_repository import (
@@ -11,13 +14,51 @@ from app.repositories.segments_repository import (
 from app.utils import bad_request, combine_meeting_no, parse_date
 
 
+def _canonical_json_value(value: Any) -> Any:
+    if isinstance(value, datetime):
+        return value.isoformat()
+    if isinstance(value, date):
+        return value.isoformat()
+    if isinstance(value, list):
+        return [_canonical_json_value(item) for item in value]
+    if isinstance(value, dict):
+        return {str(key): _canonical_json_value(value[key]) for key in sorted(value)}
+    return value
+
+
+def _build_segment_dedupe_hash(item: dict[str, Any]) -> str:
+    canonical_payload = _canonical_json_value(
+        {
+            "council": item.get("council"),
+            "committee": item.get("committee"),
+            "session": item.get("session"),
+            "meeting_no": item.get("meeting_no"),
+            "meeting_no_combined": item.get("meeting_no_combined"),
+            "meeting_date": item.get("meeting_date"),
+            "content": item.get("content"),
+            "summary": item.get("summary"),
+            "subject": item.get("subject"),
+            "tag": item.get("tag"),
+            "importance": item.get("importance"),
+            "moderator": item.get("moderator"),
+            "questioner": item.get("questioner"),
+            "answerer": item.get("answerer"),
+            "party": item.get("party"),
+            "constituency": item.get("constituency"),
+            "department": item.get("department"),
+        }
+    )
+    encoded = json.dumps(canonical_payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+
+
 def normalize_segment(item: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(item, dict):
-        raise bad_request("각 아이템은 JSON 객체여야 합니다.")
+        raise bad_request("Each item must be a JSON object.")
 
     council = item.get("council")
     if not council:
-        raise bad_request("필수 필드 누락: council")
+        raise bad_request("Missing required field: council")
 
     session = item.get("session")
     meeting_no_raw = item.get("meeting_no")
@@ -31,7 +72,7 @@ def normalize_segment(item: dict[str, Any]) -> dict[str, Any]:
 
     meeting_date = parse_date(item.get("meeting_date"))
 
-    return {
+    normalized = {
         "council": council,
         "committee": item.get("committee"),
         "session": session,
@@ -50,21 +91,23 @@ def normalize_segment(item: dict[str, Any]) -> dict[str, Any]:
         "constituency": item.get("constituency"),
         "department": item.get("department"),
     }
+    normalized["dedupe_hash"] = _build_segment_dedupe_hash(normalized)
+    return normalized
 
 
 def parse_importance_value(raw: Any, *, required: bool) -> int | None:
     if raw is None:
         if required:
-            raise bad_request("importance는 1,2,3 중 정수여야 합니다.")
+            raise bad_request("importance must be one of 1, 2, 3.")
         return None
 
     try:
         value = int(raw)
     except (TypeError, ValueError):
-        raise bad_request("importance는 1,2,3 중 정수여야 합니다.")
+        raise bad_request("importance must be an integer (1, 2, 3).")
 
     if value not in (1, 2, 3):
-        raise bad_request("importance는 1,2,3 중 하나여야 합니다.")
+        raise bad_request("importance must be one of 1, 2, 3.")
 
     return value
 
@@ -75,9 +118,9 @@ def parse_importance_query(raw: str | None) -> int | None:
     try:
         value = int(raw)
     except (TypeError, ValueError):
-        raise bad_request("importance는 정수여야 합니다.")
+        raise bad_request("importance must be an integer.")
     if value not in (1, 2, 3):
-        raise bad_request("importance는 1,2,3 중 하나여야 합니다.")
+        raise bad_request("importance must be one of 1, 2, 3.")
     return value
 
 

@@ -12,12 +12,19 @@
 - PR 템플릿 및 CODEOWNERS 기본 설정 추가
 - Redis 기반 분산 rate limiter 백엔드(`RATE_LIMIT_BACKEND=redis`, `REDIS_URL`) 지원 추가
 - 버전 단일 소스/변경이력 정합성 자동 검사 스크립트(`scripts/check_version_consistency.py`) 추가
+- 운영 헬스 분리를 위한 `GET /health/live`, `GET /health/ready` 엔드포인트 추가
+- `council_speech_segments.dedupe_hash` 및 고유 인덱스(중복 삽입 방지) 마이그레이션 추가
 
 ### 변경됨
 
 - `routes` 공통 에러 응답 상수와 `repositories` 공통 쿼리 헬퍼를 도입해 중복 코드를 축소함
 - 라우트 계층의 저장소 직접 호출을 제거하고 `service` 오케스트레이션 경유 구조로 책임 경계를 정리함
 - metrics path 라벨 cardinality 보호를 위해 라우트 미매칭 요청을 `/_unmatched`로 집계
+- `/api/segments` 삽입 동작을 정규화 payload 기반 idempotent insert로 변경 (`ON CONFLICT DO NOTHING`)
+
+### 수정됨
+
+- 인코딩 깨짐(mojibake)으로 훼손된 날짜/회의차수 관련 오류 메시지와 문자열 조합 로직 정리
 
 ## [0.1.0] - 2026-02-17
 

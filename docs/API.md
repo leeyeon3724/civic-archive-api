@@ -6,6 +6,8 @@
 |--------|------|------|
 | GET | `/` | 서버 가용성 메시지 |
 | GET | `/health` | 헬스체크 |
+| GET | `/health/live` | liveness 헬스체크 |
+| GET | `/health/ready` | readiness 헬스체크 (DB/Rate limiter backend) |
 | GET | `/metrics` | Prometheus 메트릭 |
 | POST | `/api/echo` | 요청 JSON 반사 |
 | POST | `/api/news` | 뉴스 upsert (단건/배치) |
@@ -40,6 +42,16 @@
 
 ### GET `/health`
 - 응답: `{"status": "ok"}`
+- 호환성 alias (`/health/live`와 동일한 의미)
+
+### GET `/health/live`
+- 응답: `{"status": "ok"}`
+
+### GET `/health/ready`
+- 응답(정상): `200` + `{"status":"ok","checks":{"database":{"ok":true},"rate_limit_backend":{"ok":true}}}`
+- 응답(의존성 장애): `503` + `{"status":"degraded","checks":{...}}`
+- `checks.database`: DB 연결 상태
+- `checks.rate_limit_backend`: rate limiting 백엔드 상태 (`memory`/`redis`)
 
 ### GET `/metrics`
 - 응답: Prometheus text format
@@ -125,7 +137,8 @@
 - `importance`: `1|2|3` 정수만 허용
 - 단건 객체/배열(배치) 허용
 - 응답: `{"inserted": <int>}` (201)
-- insert-only (중복 제거 없음)
+- idempotent insert: 동일 정규화 payload는 중복 저장하지 않음
+- 중복 기준: 서버 계산 `dedupe_hash` (정규화된 주요 필드 JSON의 SHA-256)
 - 인증 활성화 시 `401 (UNAUTHORIZED)` 가능
 - 요청 제한 활성화 시 `429 (RATE_LIMITED)` 가능
 
