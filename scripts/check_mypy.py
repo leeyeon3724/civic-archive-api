@@ -11,9 +11,12 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_TARGETS = [
+    "app/__init__.py",
+    "app/bootstrap",
     "app/config.py",
     "app/security.py",
     "app/observability.py",
+    "app/routes",
     "app/services",
     "app/ports",
     "app/repositories",

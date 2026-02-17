@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from app.config import Config
 
-def validate_startup_config(config) -> None:
+
+def validate_startup_config(config: Config) -> None:
     if config.BOOTSTRAP_TABLES_ON_STARTUP:
         raise RuntimeError("BOOTSTRAP_TABLES_ON_STARTUP is disabled. Run 'alembic upgrade head' before startup.")
     if config.REQUIRE_API_KEY and not (config.API_KEY or "").strip():

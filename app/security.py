@@ -8,11 +8,14 @@ from ipaddress import ip_address, ip_network
 from typing import Any, Callable
 
 from fastapi import Header, Request
-import jwt
-from jwt.exceptions import InvalidTokenError
-from jwt.types import Options
 
 from app.errors import http_error
+from app.security_jwt import (
+    authorize_claims_for_request as _authorize_claims_for_request_impl,
+    extract_values_set as _extract_values_set_impl,
+    required_scope_for_method as _required_scope_for_method_impl,
+    validate_jwt_hs256 as _validate_jwt_hs256_impl,
+)
 
 redis_module: Any | None
 RedisBaseError: type[Exception]
@@ -166,81 +169,19 @@ return current
 
 
 def _extract_values_set(claims: dict, *keys: str) -> set[str]:
-    values: set[str] = set()
-    for key in keys:
-        raw = claims.get(key)
-        if isinstance(raw, str):
-            if key == "scope":
-                values.update(token for token in raw.split() if token)
-            elif raw.strip():
-                values.add(raw.strip())
-        elif isinstance(raw, list):
-            for item in raw:
-                if isinstance(item, str) and item.strip():
-                    values.add(item.strip())
-    return values
+    return _extract_values_set_impl(claims, *keys)
 
 
 def _required_scope_for_method(config, method: str) -> str | None:
-    normalized = (method or "").upper()
-    if normalized in {"GET", "HEAD"}:
-        return (config.JWT_SCOPE_READ or "").strip() or None
-    if normalized in {"POST", "PUT", "PATCH"}:
-        return (config.JWT_SCOPE_WRITE or "").strip() or None
-    if normalized == "DELETE":
-        return (config.JWT_SCOPE_DELETE or "").strip() or None
-    return None
+    return _required_scope_for_method_impl(config, method)
 
 
 def _validate_jwt_hs256(token: str, config) -> dict:
-    secret = (config.JWT_SECRET or "").strip()
-    if not secret:
-        raise http_error(401, "UNAUTHORIZED", "Unauthorized")
-
-    audience = (config.JWT_AUDIENCE or "").strip() or None
-    issuer = (config.JWT_ISSUER or "").strip() or None
-    leeway_seconds = max(0, int(config.JWT_LEEWAY_SECONDS))
-
-    options: Options = {
-        "require": ["sub", "exp"],
-        "verify_signature": True,
-        "verify_exp": True,
-        "verify_nbf": True,
-        "verify_aud": audience is not None,
-        "verify_iss": issuer is not None,
-    }
-
-    try:
-        payload = jwt.decode(
-            token,
-            key=secret,
-            algorithms=["HS256"],
-            options=options,
-            audience=audience,
-            issuer=issuer,
-            leeway=leeway_seconds,
-        )
-    except (InvalidTokenError, TypeError, ValueError):
-        raise http_error(401, "UNAUTHORIZED", "Unauthorized")
-
-    if not isinstance(payload, dict):
-        raise http_error(401, "UNAUTHORIZED", "Unauthorized")
-    return payload
+    return _validate_jwt_hs256_impl(token, config)
 
 
 def _authorize_claims_for_request(request: Request, claims: dict, config) -> None:
-    required_scope = _required_scope_for_method(config, request.method)
-    if not required_scope:
-        return
-
-    admin_role = (config.JWT_ADMIN_ROLE or "").strip()
-    role_values = _extract_values_set(claims, "role", "roles")
-    if admin_role and admin_role in role_values:
-        return
-
-    scope_values = _extract_values_set(claims, "scope", "scopes")
-    if required_scope not in scope_values:
-        raise http_error(403, "FORBIDDEN", "Forbidden")
+    _authorize_claims_for_request_impl(request, claims, config)
 
 
 def _parse_trusted_proxy_networks(cidrs: list[str]) -> list:

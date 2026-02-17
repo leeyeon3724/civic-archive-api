@@ -5,36 +5,7 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-
-def _parse_datetime_value(raw: Any) -> Optional[datetime]:
-    if raw is None or raw == "":
-        return None
-    if isinstance(raw, datetime):
-        return raw
-    if isinstance(raw, date):
-        return datetime.combine(raw, datetime.min.time())
-    if isinstance(raw, str):
-        for fmt in ("%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S"):
-            try:
-                return datetime.strptime(raw, fmt)
-            except ValueError:
-                continue
-    raise ValueError(f"published_at format error: {raw}")
-
-
-def _parse_date_value(raw: Any, *, field_name: str) -> Optional[date]:
-    if raw is None or raw == "":
-        return None
-    if isinstance(raw, datetime):
-        return raw.date()
-    if isinstance(raw, date):
-        return raw
-    if isinstance(raw, str):
-        try:
-            return datetime.strptime(raw, "%Y-%m-%d").date()
-        except ValueError as exc:
-            raise ValueError(f"{field_name} must be YYYY-MM-DD") from exc
-    raise ValueError(f"{field_name} must be YYYY-MM-DD")
+from app.parsing import parse_date_value, parse_datetime_value
 
 
 class StrictRequestModel(BaseModel):
@@ -130,7 +101,10 @@ class NewsUpsertItem(StrictRequestModel):
     @field_validator("published_at", mode="before")
     @classmethod
     def _validate_published_at(cls, value: Any) -> Optional[datetime]:
-        return _parse_datetime_value(value)
+        try:
+            return parse_datetime_value(value)
+        except ValueError:
+            raise ValueError(f"published_at format error: {value}")
 
 
 NewsUpsertPayload = NewsUpsertItem | list[NewsUpsertItem]
@@ -177,7 +151,10 @@ class MinutesUpsertItem(StrictRequestModel):
     @field_validator("meeting_date", mode="before")
     @classmethod
     def _validate_meeting_date(cls, value: Any) -> Optional[date]:
-        return _parse_date_value(value, field_name="meeting_date")
+        try:
+            return parse_date_value(value)
+        except ValueError as exc:
+            raise ValueError("meeting_date must be YYYY-MM-DD") from exc
 
 
 MinutesUpsertPayload = MinutesUpsertItem | list[MinutesUpsertItem]
@@ -235,7 +212,10 @@ class SegmentsInsertItem(StrictRequestModel):
     @field_validator("meeting_date", mode="before")
     @classmethod
     def _validate_meeting_date(cls, value: Any) -> Optional[date]:
-        return _parse_date_value(value, field_name="meeting_date")
+        try:
+            return parse_date_value(value)
+        except ValueError as exc:
+            raise ValueError("meeting_date must be YYYY-MM-DD") from exc
 
 
 SegmentsInsertPayload = SegmentsInsertItem | list[SegmentsInsertItem]

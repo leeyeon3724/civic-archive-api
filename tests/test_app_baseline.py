@@ -235,7 +235,9 @@ def test_list_news_returns_paginated_payload(client, use_stub_connection_provide
     assert data["total"] == 1
     assert data["items"][0]["id"] == 10
 
-    first_select = next(c for c in engine.connection.calls if "from news_articles" in c["statement"].lower())
+    first_select = next(
+        c for c in engine.connection.calls if isinstance(c.get("params"), dict) and "limit" in c["params"]
+    )
     assert first_select["params"]["limit"] == 1
     assert first_select["params"]["offset"] == 1
     assert first_select["params"]["q"] == "%budget%"

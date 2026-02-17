@@ -8,6 +8,7 @@ from app.ports.services import NewsServicePort
 from app.routes.common import ERROR_RESPONSES, enforce_ingest_batch_limit
 from app.schemas import (
     DeleteResponse,
+    NewsItemBase,
     NewsItemDetail,
     NewsListResponse,
     NewsUpsertPayload,
@@ -51,7 +52,7 @@ def save_news(
         ],
     ),
     service: NewsServicePort = Depends(get_news_service),
-):
+) -> UpsertResponse:
     payload_items = payload if isinstance(payload, list) else [payload]
     enforce_ingest_batch_limit(request, len(payload_items))
     items: list[dict[str, Any]] = [service.normalize_article(item.model_dump()) for item in payload_items]
@@ -73,7 +74,7 @@ def list_news(
     date_from: date | None = Query(default=None, alias="from"),
     date_to: date | None = Query(default=None, alias="to"),
     service: NewsServicePort = Depends(get_news_service),
-):
+) -> NewsListResponse:
     rows, total = service.list_articles(
         q=q,
         source=source,
@@ -83,7 +84,7 @@ def list_news(
         size=size,
     )
 
-    return NewsListResponse(page=page, size=size, total=total, items=rows)
+    return NewsListResponse(page=page, size=size, total=total, items=[NewsItemBase(**row) for row in rows])
 
 
 @router.get(
@@ -92,7 +93,7 @@ def list_news(
     response_model=NewsItemDetail,
     responses=ERROR_RESPONSES,
 )
-def get_news(item_id: int, service: NewsServicePort = Depends(get_news_service)):
+def get_news(item_id: int, service: NewsServicePort = Depends(get_news_service)) -> NewsItemDetail:
     row = service.get_article(item_id)
     if not row:
         raise http_error(404, "NOT_FOUND", "Not Found")
@@ -105,7 +106,7 @@ def get_news(item_id: int, service: NewsServicePort = Depends(get_news_service))
     response_model=DeleteResponse,
     responses=ERROR_RESPONSES,
 )
-def delete_news(item_id: int, service: NewsServicePort = Depends(get_news_service)):
+def delete_news(item_id: int, service: NewsServicePort = Depends(get_news_service)) -> DeleteResponse:
     deleted = service.delete_article(item_id)
     if not deleted:
         raise http_error(404, "NOT_FOUND", "Not Found")

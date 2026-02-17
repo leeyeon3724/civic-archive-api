@@ -7,29 +7,6 @@ from typing import Any
 from app.repositories.session_provider import ConnectionProvider, open_connection_scope
 
 
-def accumulate_upsert_result(result, *, inserted: int, updated: int) -> tuple[int, int]:
-    inserted_flag = None
-
-    scalar = getattr(result, "scalar", None)
-    if callable(scalar):
-        try:
-            inserted_flag = scalar()
-        except Exception:
-            inserted_flag = None
-
-    if inserted_flag is True:
-        return inserted + 1, updated
-    if inserted_flag is False:
-        return inserted, updated + 1
-
-    rowcount = getattr(result, "rowcount", 0)
-    if rowcount == 1:
-        return inserted + 1, updated
-    if rowcount == 2:
-        return inserted, updated + 1
-    return inserted, updated
-
-
 def _json_default(value: Any) -> Any:
     if isinstance(value, (datetime, date)):
         return value.isoformat()

@@ -3,6 +3,7 @@ from datetime import date, datetime
 from fastapi import HTTPException
 
 from app.errors import http_error
+from app.parsing import parse_date_value, parse_datetime_value
 
 
 def bad_request(message: str) -> HTTPException:
@@ -10,31 +11,20 @@ def bad_request(message: str) -> HTTPException:
 
 
 def parse_datetime(dt: str | datetime | date | None) -> datetime | None:
-    if dt is None:
-        return None
-    if isinstance(dt, datetime):
-        return dt
-    if isinstance(dt, date):
-        return datetime.combine(dt, datetime.min.time())
-    for fmt in ("%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S"):
-        try:
-            return datetime.strptime(dt, fmt)
-        except ValueError:
-            continue
-    raise bad_request(f"published_at format error: {dt}")
+    try:
+        return parse_datetime_value(dt)
+    except ValueError:
+        raise bad_request(f"published_at format error: {dt}")
 
 
 def parse_date(d: str | datetime | date | None) -> datetime | None:
-    if d is None:
-        return None
-    if isinstance(d, datetime):
-        return d
-    if isinstance(d, date):
-        return datetime.combine(d, datetime.min.time())
     try:
-        return datetime.strptime(d, "%Y-%m-%d")
+        parsed = parse_date_value(d)
     except ValueError:
         raise bad_request(f"meeting_date format error (YYYY-MM-DD): {d}")
+    if parsed is None:
+        return None
+    return datetime.combine(parsed, datetime.min.time())
 
 
 def combine_meeting_no(session_val, meeting_no_raw, meeting_no_int) -> str | None:

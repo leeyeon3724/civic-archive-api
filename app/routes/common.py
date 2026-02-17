@@ -1,9 +1,11 @@
+from typing import Any
+
 from fastapi import Request
 
 from app.errors import http_error
 from app.schemas import ErrorResponse
 
-ERROR_RESPONSES = {
+ERROR_RESPONSES: dict[int | str, dict[str, Any]] = {
     400: {"model": ErrorResponse},
     401: {"model": ErrorResponse},
     403: {"model": ErrorResponse},

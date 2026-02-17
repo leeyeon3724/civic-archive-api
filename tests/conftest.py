@@ -71,7 +71,13 @@ class StubConnection:
         self.calls: List[Dict[str, Any]] = []
 
     def execute(self, statement: Any, params: Optional[Dict[str, Any]] = None) -> StubResult:
-        self.calls.append({"statement": str(statement), "params": params})
+        self.calls.append(
+            {
+                "statement": str(statement),
+                "statement_obj": statement,
+                "params": params,
+            }
+        )
         return self._handler(statement, params)
 
 

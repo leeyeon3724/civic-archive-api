@@ -1,13 +1,20 @@
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable, MutableMapping
+from typing import Any
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.responses import Response
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
+from app.config import Config
 from app.errors import error_response
 
+ReceiveMessage = MutableMapping[str, Any]
 
-def register_core_middleware(api: FastAPI, config) -> None:
+
+def register_core_middleware(api: FastAPI, config: Config) -> None:
     api.add_middleware(
         CORSMiddleware,
         allow_origins=config.cors_allow_origins_list,
@@ -17,7 +24,10 @@ def register_core_middleware(api: FastAPI, config) -> None:
     api.add_middleware(TrustedHostMiddleware, allowed_hosts=config.allowed_hosts_list)
 
     @api.middleware("http")
-    async def request_size_guard(request: Request, call_next):
+    async def request_size_guard(
+        request: Request,
+        call_next: Callable[[Request], Awaitable[Response]],
+    ) -> Response:
         guard_details_attr = "_request_size_guard_details"
         if request.url.path.startswith("/api/") and request.method in {"POST", "PUT", "PATCH"}:
             max_request_body_bytes = int(config.MAX_REQUEST_BODY_BYTES)
@@ -45,9 +55,9 @@ def register_core_middleware(api: FastAPI, config) -> None:
                         },
                     )
             received_bytes = 0
-            original_receive = request._receive  # type: ignore[attr-defined]
+            original_receive: Callable[[], Awaitable[ReceiveMessage]] = request._receive
 
-            async def guarded_receive() -> dict:
+            async def guarded_receive() -> ReceiveMessage:
                 nonlocal received_bytes
                 message = await original_receive()
                 if message.get("type") != "http.request":
@@ -67,7 +77,7 @@ def register_core_middleware(api: FastAPI, config) -> None:
                     return {"type": "http.request", "body": b"", "more_body": False}
                 return message
 
-            request._receive = guarded_receive  # type: ignore[attr-defined]
+            request._receive = guarded_receive
         try:
             response = await call_next(request)
         except Exception:
@@ -92,4 +102,3 @@ def register_core_middleware(api: FastAPI, config) -> None:
                 details=details,
             )
         return response
-

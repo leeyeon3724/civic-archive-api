@@ -4,27 +4,28 @@ from fastapi import Body, FastAPI, Request
 from fastapi.responses import JSONResponse, PlainTextResponse
 
 from app.bootstrap.contracts import DBHealthCheck, ProtectedDependencies, RateLimitHealthCheck
+from app.config import Config
 from app.schemas import EchoResponse, ErrorResponse, HealthResponse, ReadinessCheck, ReadinessResponse
 
 
 def register_system_routes(
     api: FastAPI,
     *,
-    config,
+    config: Config,
     protected_dependencies: ProtectedDependencies,
     db_health_check: DBHealthCheck,
     rate_limit_health_check: RateLimitHealthCheck,
 ) -> None:
     @api.get("/", tags=["system"])
-    async def hello_world():
+    async def hello_world() -> PlainTextResponse:
         return PlainTextResponse("API Server Available")
 
     @api.get("/health/live", tags=["system"], response_model=HealthResponse, responses={500: {"model": ErrorResponse}})
-    async def health_live():
+    async def health_live() -> HealthResponse:
         return HealthResponse(status="ok")
 
     @api.get("/health", tags=["system"], response_model=HealthResponse, responses={500: {"model": ErrorResponse}})
-    async def health():
+    async def health() -> HealthResponse:
         return await health_live()
 
     @api.get(
@@ -33,7 +34,7 @@ def register_system_routes(
         response_model=ReadinessResponse,
         responses={500: {"model": ErrorResponse}, 503: {"model": ReadinessResponse}},
     )
-    async def health_ready():
+    async def health_ready() -> ReadinessResponse | JSONResponse:
         db_ok, db_detail = db_health_check()
         rate_limit_ok, rate_limit_detail = rate_limit_health_check()
         checks = {
@@ -63,7 +64,7 @@ def register_system_routes(
             500: {"model": ErrorResponse},
         },
     )
-    async def echo(request: Request, _payload: dict = Body(default_factory=dict)):
+    async def echo(request: Request, _payload: dict = Body(default_factory=dict)) -> EchoResponse:
         try:
             data = await request.json()
         except Exception:

@@ -1,4 +1,5 @@
 import logging
+from typing import Any
 
 from fastapi import Depends, FastAPI
 from sqlalchemy import text
@@ -22,7 +23,7 @@ from app.security import (
 )
 from app.version import APP_VERSION
 
-OPENAPI_TAGS = [
+OPENAPI_TAGS: list[dict[str, str]] = [
     {"name": "system", "description": "System and health endpoints"},
     {"name": "news", "description": "News ingestion and search"},
     {"name": "minutes", "description": "Council minutes ingestion and search"},
@@ -32,7 +33,7 @@ OPENAPI_TAGS = [
 logger = logging.getLogger("civic_archive.api")
 
 
-def create_app(config=None):
+def create_app(config: Config | None = None) -> FastAPI:
     if config is None:
         config = Config()
 
@@ -66,7 +67,11 @@ def create_app(config=None):
     api_key_dependency = build_api_key_dependency(config)
     jwt_dependency = build_jwt_dependency(config)
     rate_limit_dependency = build_rate_limit_dependency(config)
-    protected_dependencies = [Depends(api_key_dependency), Depends(jwt_dependency), Depends(rate_limit_dependency)]
+    protected_dependencies: list[Any] = [
+        Depends(api_key_dependency),
+        Depends(jwt_dependency),
+        Depends(rate_limit_dependency),
+    ]
 
     def db_health_check() -> tuple[bool, str | None]:
         try:

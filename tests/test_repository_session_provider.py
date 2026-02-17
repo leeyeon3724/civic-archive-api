@@ -17,8 +17,8 @@ def test_open_connection_scope_uses_explicit_provider(make_engine):
 def test_repository_function_accepts_explicit_connection_provider(make_engine):
     default_engine = make_engine(lambda _statement, _params: StubResult())
     injected_engine = make_engine(
-        lambda statement, _params: StubResult(rows=[{"id": 7}])
-        if "from news_articles where id=:id" in str(statement).lower()
+        lambda _statement, params: StubResult(rows=[{"id": 7}])
+        if params and params.get("id") == 7
         else StubResult()
     )
 

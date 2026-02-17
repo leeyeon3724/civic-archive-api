@@ -134,7 +134,9 @@ def test_list_minutes_returns_paginated_payload_and_filter_params(client, use_st
     assert data["total"] == 1
     assert data["items"][0]["id"] == 101
 
-    first_select = next(c for c in engine.connection.calls if "from council_minutes" in c["statement"].lower())
+    first_select = next(
+        c for c in engine.connection.calls if isinstance(c.get("params"), dict) and "limit" in c["params"]
+    )
     assert first_select["params"]["limit"] == 1
     assert first_select["params"]["offset"] == 1
     assert first_select["params"]["q"] == "%budget%"
@@ -273,7 +275,7 @@ def test_list_segments_returns_paginated_payload_and_filter_params(client, use_s
     assert data["items"][0]["id"] == 501
 
     first_select = next(
-        c for c in engine.connection.calls if "from council_speech_segments" in c["statement"].lower()
+        c for c in engine.connection.calls if isinstance(c.get("params"), dict) and "limit" in c["params"]
     )
     assert first_select["params"]["limit"] == 1
     assert first_select["params"]["offset"] == 1

@@ -5,6 +5,7 @@ from typing import Any, Optional
 from fastapi import HTTPException, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 DEFAULT_ERROR_CODES = {
     400: "BAD_REQUEST",
@@ -62,7 +63,7 @@ def error_response(
     )
 
 
-def normalize_http_exception(request: Request, exc: HTTPException) -> JSONResponse:
+def normalize_http_exception(request: Request, exc: StarletteHTTPException) -> JSONResponse:
     detail = exc.detail
     if isinstance(detail, dict):
         code = str(detail.get("code") or DEFAULT_ERROR_CODES.get(exc.status_code, "HTTP_ERROR"))

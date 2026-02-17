@@ -10,6 +10,7 @@ from app.schemas import (
     DeleteResponse,
     InsertResponse,
     SegmentsInsertPayload,
+    SegmentsItemBase,
     SegmentsItemDetail,
     SegmentsListResponse,
 )
@@ -42,7 +43,7 @@ def save_segments(
         ],
     ),
     service: SegmentsServicePort = Depends(get_segments_service),
-):
+) -> InsertResponse:
     payload_items = payload if isinstance(payload, list) else [payload]
     enforce_ingest_batch_limit(request, len(payload_items))
     items: list[dict[str, Any]] = [service.normalize_segment(item.model_dump()) for item in payload_items]
@@ -71,7 +72,7 @@ def list_segments(
     date_from: date | None = Query(default=None, alias="from"),
     date_to: date | None = Query(default=None, alias="to"),
     service: SegmentsServicePort = Depends(get_segments_service),
-):
+) -> SegmentsListResponse:
     rows, total = service.list_segments(
         q=q,
         council=council,
@@ -88,7 +89,7 @@ def list_segments(
         size=size,
     )
 
-    return SegmentsListResponse(page=page, size=size, total=total, items=rows)
+    return SegmentsListResponse(page=page, size=size, total=total, items=[SegmentsItemBase(**row) for row in rows])
 
 
 @router.get(
@@ -97,7 +98,7 @@ def list_segments(
     response_model=SegmentsItemDetail,
     responses=ERROR_RESPONSES,
 )
-def get_segment(item_id: int, service: SegmentsServicePort = Depends(get_segments_service)):
+def get_segment(item_id: int, service: SegmentsServicePort = Depends(get_segments_service)) -> SegmentsItemDetail:
     row = service.get_segment(item_id)
     if not row:
         raise http_error(404, "NOT_FOUND", "Not Found")
@@ -110,7 +111,7 @@ def get_segment(item_id: int, service: SegmentsServicePort = Depends(get_segment
     response_model=DeleteResponse,
     responses=ERROR_RESPONSES,
 )
-def delete_segment(item_id: int, service: SegmentsServicePort = Depends(get_segments_service)):
+def delete_segment(item_id: int, service: SegmentsServicePort = Depends(get_segments_service)) -> DeleteResponse:
     deleted = service.delete_segment(item_id)
     if not deleted:
         raise http_error(404, "NOT_FOUND", "Not Found")
