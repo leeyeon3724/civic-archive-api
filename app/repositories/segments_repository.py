@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from sqlalchemy import text
 
 from app import database
+from app.repositories.common import build_where_clause, execute_paginated_query
 
 
 def insert_segments(items: List[Dict[str, Any]]) -> int:
@@ -123,10 +124,9 @@ def list_segments(
         where.append("meeting_date <= :date_to")
         params["date_to"] = date_to
 
-    where_sql = (" WHERE " + " AND ".join(where)) if where else ""
+    where_sql = build_where_clause(where)
 
-    list_sql = text(
-        f"""
+    list_sql = f"""
         SELECT
             id, council, committee, "session", meeting_no_combined AS meeting_no, meeting_date,
             summary, subject, tag, importance, moderator, questioner, answerer,
@@ -136,24 +136,14 @@ def list_segments(
         ORDER BY COALESCE(meeting_date, created_at) DESC, id DESC
         LIMIT :limit OFFSET :offset
         """
-    )
 
-    count_sql = text(
-        f"""
+    count_sql = f"""
         SELECT COUNT(*) AS total
         FROM council_speech_segments
         {where_sql}
         """
-    )
 
-    with database.engine.begin() as conn:
-        rows = conn.execute(
-            list_sql,
-            {**params, "limit": size, "offset": (page - 1) * size},
-        ).mappings().all()
-        total = conn.execute(count_sql, params).scalar() or 0
-
-    return [dict(row) for row in rows], int(total)
+    return execute_paginated_query(list_sql=list_sql, count_sql=count_sql, params=params, page=page, size=size)
 
 
 def get_segment(item_id: int) -> Optional[Dict[str, Any]]:

@@ -4,30 +4,17 @@ from typing import Any
 from fastapi import APIRouter, Body, Query
 
 from app.errors import http_error
+from app.routes.common import ERROR_RESPONSES
+from app.schemas import DeleteResponse, MinutesItemDetail, MinutesListResponse, MinutesUpsertPayload, UpsertResponse
 from app.repositories.minutes_repository import (
     delete_minutes as delete_minutes_item,
     get_minutes as get_minutes_item,
     list_minutes as list_minutes_items,
     upsert_minutes,
 )
-from app.schemas import (
-    DeleteResponse,
-    ErrorResponse,
-    MinutesItemDetail,
-    MinutesListResponse,
-    MinutesUpsertPayload,
-    UpsertResponse,
+from app.services.minutes_service import (
+    normalize_minutes,
 )
-from app.services.minutes_service import normalize_minutes
-
-ERROR_RESPONSES = {
-    400: {"model": ErrorResponse},
-    401: {"model": ErrorResponse},
-    404: {"model": ErrorResponse},
-    422: {"model": ErrorResponse},
-    429: {"model": ErrorResponse},
-    500: {"model": ErrorResponse},
-}
 
 router = APIRouter(tags=["minutes"])
 

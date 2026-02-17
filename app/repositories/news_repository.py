@@ -6,29 +6,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from sqlalchemy import text
 
 from app import database
-
-
-def _accumulate_upsert_result(result, *, inserted: int, updated: int) -> Tuple[int, int]:
-    inserted_flag = None
-
-    scalar = getattr(result, "scalar", None)
-    if callable(scalar):
-        try:
-            inserted_flag = scalar()
-        except Exception:
-            inserted_flag = None
-
-    if inserted_flag is True:
-        return inserted + 1, updated
-    if inserted_flag is False:
-        return inserted, updated + 1
-
-    rowcount = getattr(result, "rowcount", 0)
-    if rowcount == 1:
-        return inserted + 1, updated
-    if rowcount == 2:
-        return inserted, updated + 1
-    return inserted, updated
+from app.repositories.common import accumulate_upsert_result, build_where_clause, execute_paginated_query
 
 
 def upsert_articles(articles: List[Dict[str, Any]]) -> Tuple[int, int]:
@@ -67,7 +45,7 @@ def upsert_articles(articles: List[Dict[str, Any]]) -> Tuple[int, int]:
                 "keywords": json.dumps(article.get("keywords")) if article.get("keywords") is not None else None,
             }
             result = conn.execute(sql, params)
-            inserted, updated = _accumulate_upsert_result(result, inserted=inserted, updated=updated)
+            inserted, updated = accumulate_upsert_result(result, inserted=inserted, updated=updated)
 
     return inserted, updated
 
@@ -100,10 +78,9 @@ def list_articles(
         where.append("published_at <= :date_to")
         params["date_to"] = date_to
 
-    where_sql = (" WHERE " + " AND ".join(where)) if where else ""
+    where_sql = build_where_clause(where)
 
-    list_sql = text(
-        f"""
+    list_sql = f"""
         SELECT
             id, source, title, url, published_at, author, summary, keywords, created_at, updated_at
         FROM news_articles
@@ -111,24 +88,14 @@ def list_articles(
         ORDER BY COALESCE(published_at, created_at) DESC, id DESC
         LIMIT :limit OFFSET :offset
         """
-    )
 
-    count_sql = text(
-        f"""
+    count_sql = f"""
         SELECT COUNT(*) AS total
         FROM news_articles
         {where_sql}
         """
-    )
 
-    with database.engine.begin() as conn:
-        rows = conn.execute(
-            list_sql,
-            {**params, "limit": size, "offset": (page - 1) * size},
-        ).mappings().all()
-        total = conn.execute(count_sql, params).scalar() or 0
-
-    return [dict(row) for row in rows], int(total)
+    return execute_paginated_query(list_sql=list_sql, count_sql=count_sql, params=params, page=page, size=size)
 
 
 def get_article(item_id: int) -> Optional[Dict[str, Any]]:

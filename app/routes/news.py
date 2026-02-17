@@ -4,25 +4,16 @@ from typing import Any
 from fastapi import APIRouter, Body, Query
 
 from app.errors import http_error
-from app.repositories.news_repository import delete_article, get_article, list_articles, upsert_articles
+from app.routes.common import ERROR_RESPONSES
 from app.schemas import (
     DeleteResponse,
-    ErrorResponse,
     NewsItemDetail,
     NewsListResponse,
     NewsUpsertPayload,
     UpsertResponse,
 )
+from app.repositories.news_repository import delete_article, get_article, list_articles, upsert_articles
 from app.services.news_service import normalize_article
-
-ERROR_RESPONSES = {
-    400: {"model": ErrorResponse},
-    401: {"model": ErrorResponse},
-    404: {"model": ErrorResponse},
-    422: {"model": ErrorResponse},
-    429: {"model": ErrorResponse},
-    500: {"model": ErrorResponse},
-}
 
 router = APIRouter(tags=["news"])
 

@@ -11,6 +11,10 @@
 - 기여/버전 정책 문서 추가 (`docs/CONTRIBUTING.md`, `docs/VERSIONING.md`)
 - PR 템플릿 및 CODEOWNERS 기본 설정 추가
 
+### 변경됨
+
+- `routes` 공통 에러 응답 상수와 `repositories` 공통 쿼리 헬퍼를 도입해 중복 코드를 축소함
+
 ## [0.1.0] - 2026-02-17
 
 ### 추가됨

@@ -4,30 +4,23 @@ from typing import Any
 from fastapi import APIRouter, Body, Query
 
 from app.errors import http_error
+from app.routes.common import ERROR_RESPONSES
+from app.schemas import (
+    DeleteResponse,
+    InsertResponse,
+    SegmentsInsertPayload,
+    SegmentsItemDetail,
+    SegmentsListResponse,
+)
 from app.repositories.segments_repository import (
     delete_segment as delete_segment_item,
     get_segment as get_segment_item,
     insert_segments,
     list_segments as list_segments_items,
 )
-from app.schemas import (
-    DeleteResponse,
-    ErrorResponse,
-    InsertResponse,
-    SegmentsInsertPayload,
-    SegmentsItemDetail,
-    SegmentsListResponse,
+from app.services.segments_service import (
+    normalize_segment,
 )
-from app.services.segments_service import normalize_segment
-
-ERROR_RESPONSES = {
-    400: {"model": ErrorResponse},
-    401: {"model": ErrorResponse},
-    404: {"model": ErrorResponse},
-    422: {"model": ErrorResponse},
-    429: {"model": ErrorResponse},
-    500: {"model": ErrorResponse},
-}
 
 router = APIRouter(tags=["segments"])
 
