@@ -1,33 +1,12 @@
 from __future__ import annotations
 
-from typing import Any, Protocol
+from typing import Any
 
+from app.ports.repositories import NewsRepositoryPort
+from app.ports.services import NewsServicePort
 from app.repositories.news_repository import NewsRepository
 from app.repositories.session_provider import ConnectionProvider
 from app.utils import bad_request, parse_datetime
-
-
-class NewsRepositoryPort(Protocol):
-    def upsert_articles(self, articles: list[dict[str, Any]]) -> tuple[int, int]:
-        ...
-
-    def list_articles(
-        self,
-        *,
-        q: str | None,
-        source: str | None,
-        date_from: str | None,
-        date_to: str | None,
-        page: int,
-        size: int,
-    ) -> tuple[list[dict[str, Any]], int]:
-        ...
-
-    def get_article(self, item_id: int) -> dict[str, Any] | None:
-        ...
-
-    def delete_article(self, item_id: int) -> bool:
-        ...
 
 
 def _normalize_article(item: dict[str, Any]) -> dict[str, Any]:
@@ -51,7 +30,7 @@ def _normalize_article(item: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-class NewsService:
+class NewsService(NewsServicePort):
     def __init__(self, *, repository: NewsRepositoryPort) -> None:
         self._repository = repository
 
@@ -91,7 +70,7 @@ def build_news_service(
     *,
     repository: NewsRepositoryPort | None = None,
     connection_provider: ConnectionProvider | None = None,
-) -> NewsService:
+) -> NewsServicePort:
     selected_repository = repository or NewsRepository(connection_provider=connection_provider)
     return NewsService(repository=selected_repository)
 
@@ -103,7 +82,7 @@ def normalize_article(item: dict[str, Any]) -> dict[str, Any]:
 def upsert_articles(
     items: list[dict[str, Any]],
     *,
-    service: NewsService | None = None,
+    service: NewsServicePort | None = None,
     connection_provider: ConnectionProvider | None = None,
 ) -> tuple[int, int]:
     active_service = service or build_news_service(connection_provider=connection_provider)
@@ -118,7 +97,7 @@ def list_articles(
     date_to: str | None,
     page: int,
     size: int,
-    service: NewsService | None = None,
+    service: NewsServicePort | None = None,
     connection_provider: ConnectionProvider | None = None,
 ) -> tuple[list[dict[str, Any]], int]:
     active_service = service or build_news_service(connection_provider=connection_provider)
@@ -135,7 +114,7 @@ def list_articles(
 def get_article(
     item_id: int,
     *,
-    service: NewsService | None = None,
+    service: NewsServicePort | None = None,
     connection_provider: ConnectionProvider | None = None,
 ) -> dict[str, Any] | None:
     active_service = service or build_news_service(connection_provider=connection_provider)
@@ -145,7 +124,7 @@ def get_article(
 def delete_article(
     item_id: int,
     *,
-    service: NewsService | None = None,
+    service: NewsServicePort | None = None,
     connection_provider: ConnectionProvider | None = None,
 ) -> bool:
     active_service = service or build_news_service(connection_provider=connection_provider)

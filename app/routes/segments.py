@@ -4,6 +4,7 @@ from typing import Any
 from fastapi import APIRouter, Body, Depends, Query, Request
 
 from app.errors import http_error
+from app.ports.services import SegmentsServicePort
 from app.routes.common import ERROR_RESPONSES, enforce_ingest_batch_limit
 from app.schemas import (
     DeleteResponse,
@@ -13,7 +14,6 @@ from app.schemas import (
     SegmentsListResponse,
 )
 from app.services.providers import get_segments_service
-from app.services.segments_service import SegmentsService
 
 router = APIRouter(tags=["segments"])
 
@@ -41,7 +41,7 @@ def save_segments(
             }
         ],
     ),
-    service: SegmentsService = Depends(get_segments_service),
+    service: SegmentsServicePort = Depends(get_segments_service),
 ):
     payload_items = payload if isinstance(payload, list) else [payload]
     enforce_ingest_batch_limit(request, len(payload_items))
@@ -70,7 +70,7 @@ def list_segments(
     size: int = Query(default=20, ge=1, le=200),
     date_from: date | None = Query(default=None, alias="from"),
     date_to: date | None = Query(default=None, alias="to"),
-    service: SegmentsService = Depends(get_segments_service),
+    service: SegmentsServicePort = Depends(get_segments_service),
 ):
     rows, total = service.list_segments(
         q=q,
@@ -97,7 +97,7 @@ def list_segments(
     response_model=SegmentsItemDetail,
     responses=ERROR_RESPONSES,
 )
-def get_segment(item_id: int, service: SegmentsService = Depends(get_segments_service)):
+def get_segment(item_id: int, service: SegmentsServicePort = Depends(get_segments_service)):
     row = service.get_segment(item_id)
     if not row:
         raise http_error(404, "NOT_FOUND", "Not Found")
@@ -110,7 +110,7 @@ def get_segment(item_id: int, service: SegmentsService = Depends(get_segments_se
     response_model=DeleteResponse,
     responses=ERROR_RESPONSES,
 )
-def delete_segment(item_id: int, service: SegmentsService = Depends(get_segments_service)):
+def delete_segment(item_id: int, service: SegmentsServicePort = Depends(get_segments_service)):
     deleted = service.delete_segment(item_id)
     if not deleted:
         raise http_error(404, "NOT_FOUND", "Not Found")

@@ -1,36 +1,12 @@
 from __future__ import annotations
 
-from typing import Any, Protocol
+from typing import Any
 
+from app.ports.repositories import MinutesRepositoryPort
+from app.ports.services import MinutesServicePort
 from app.repositories.minutes_repository import MinutesRepository
 from app.repositories.session_provider import ConnectionProvider
 from app.utils import bad_request, combine_meeting_no, parse_date
-
-
-class MinutesRepositoryPort(Protocol):
-    def upsert_minutes(self, items: list[dict[str, Any]]) -> tuple[int, int]:
-        ...
-
-    def list_minutes(
-        self,
-        *,
-        q: str | None,
-        council: str | None,
-        committee: str | None,
-        session: str | None,
-        meeting_no: str | None,
-        date_from: str | None,
-        date_to: str | None,
-        page: int,
-        size: int,
-    ) -> tuple[list[dict[str, Any]], int]:
-        ...
-
-    def get_minutes(self, item_id: int) -> dict[str, Any] | None:
-        ...
-
-    def delete_minutes(self, item_id: int) -> bool:
-        ...
 
 
 def _normalize_minutes(item: dict[str, Any]) -> dict[str, Any]:
@@ -69,7 +45,7 @@ def _normalize_minutes(item: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-class MinutesService:
+class MinutesService(MinutesServicePort):
     def __init__(self, *, repository: MinutesRepositoryPort) -> None:
         self._repository = repository
 
@@ -115,7 +91,7 @@ def build_minutes_service(
     *,
     repository: MinutesRepositoryPort | None = None,
     connection_provider: ConnectionProvider | None = None,
-) -> MinutesService:
+) -> MinutesServicePort:
     selected_repository = repository or MinutesRepository(connection_provider=connection_provider)
     return MinutesService(repository=selected_repository)
 
@@ -127,7 +103,7 @@ def normalize_minutes(item: dict[str, Any]) -> dict[str, Any]:
 def upsert_minutes(
     items: list[dict[str, Any]],
     *,
-    service: MinutesService | None = None,
+    service: MinutesServicePort | None = None,
     connection_provider: ConnectionProvider | None = None,
 ) -> tuple[int, int]:
     active_service = service or build_minutes_service(connection_provider=connection_provider)
@@ -145,7 +121,7 @@ def list_minutes(
     date_to: str | None,
     page: int,
     size: int,
-    service: MinutesService | None = None,
+    service: MinutesServicePort | None = None,
     connection_provider: ConnectionProvider | None = None,
 ) -> tuple[list[dict[str, Any]], int]:
     active_service = service or build_minutes_service(connection_provider=connection_provider)
@@ -165,7 +141,7 @@ def list_minutes(
 def get_minutes(
     item_id: int,
     *,
-    service: MinutesService | None = None,
+    service: MinutesServicePort | None = None,
     connection_provider: ConnectionProvider | None = None,
 ) -> dict[str, Any] | None:
     active_service = service or build_minutes_service(connection_provider=connection_provider)
@@ -175,7 +151,7 @@ def get_minutes(
 def delete_minutes(
     item_id: int,
     *,
-    service: MinutesService | None = None,
+    service: MinutesServicePort | None = None,
     connection_provider: ConnectionProvider | None = None,
 ) -> bool:
     active_service = service or build_minutes_service(connection_provider=connection_provider)

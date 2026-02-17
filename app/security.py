@@ -8,19 +8,36 @@ import logging
 import threading
 import time
 from ipaddress import ip_address, ip_network
-from typing import Callable
+from typing import Any, Callable
 
 from fastapi import Header, Request
 
 from app.errors import http_error
 
+redis_module: Any | None
+RedisBaseError: type[Exception]
+RedisNoScriptError: type[Exception]
+
 try:
-    import redis
-    from redis.exceptions import NoScriptError, RedisError
+    import redis as redis_module
+    from redis.exceptions import NoScriptError as RedisNoScriptError
+    from redis.exceptions import RedisError as RedisBaseError
 except Exception:  # pragma: no cover - exercised only when redis is unavailable.
-    redis = None  # type: ignore[assignment]
-    RedisError = Exception  # type: ignore[assignment]
-    NoScriptError = Exception  # type: ignore[assignment]
+    redis_module = None
+
+    class _RedisBaseError(Exception):
+        pass
+
+    class _RedisNoScriptError(_RedisBaseError):
+        pass
+
+    RedisBaseError = _RedisBaseError
+    RedisNoScriptError = _RedisNoScriptError
+
+# Backward-compatible aliases for existing tests/runtime monkeypatch hooks.
+redis = redis_module
+RedisError = RedisBaseError
+NoScriptError = RedisNoScriptError
 
 logger = logging.getLogger("civic_archive.security")
 
@@ -88,7 +105,7 @@ return current
         self.fail_open = bool(fail_open)
         self._monotonic = monotonic or time.monotonic
         self._script_sha: str | None = None
-        self._client = None
+        self._client: Any | None = None
         self._degraded_until = 0.0
 
         if not self.enabled:
@@ -123,7 +140,7 @@ return current
 
         try:
             current = int(self._eval_counter(redis_key))
-        except RedisError:
+        except RedisBaseError:
             self._degraded_until = now + float(self.failure_cooldown_seconds)
             logger.warning(
                 "rate_limit_redis_error",
@@ -144,7 +161,7 @@ return current
 
         try:
             return int(self._client.evalsha(self._script_sha, 1, redis_key, self.window_seconds))
-        except NoScriptError:
+        except RedisNoScriptError:
             return int(self._client.eval(self._WINDOW_SCRIPT, 1, redis_key, self.window_seconds))
 
 
@@ -349,7 +366,7 @@ def check_rate_limit_backend_health(config) -> tuple[bool, str | None]:
         )
         client.ping()
         return True, None
-    except RedisError as exc:
+    except RedisBaseError as exc:
         return False, str(exc)
 
 

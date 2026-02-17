@@ -60,7 +60,7 @@ class Config(BaseSettings):
     CORS_ALLOW_HEADERS: str = "*"
     ALLOWED_HOSTS: str = "*"
 
-    @computed_field
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def DATABASE_URL(self) -> str:
         return URL.create(

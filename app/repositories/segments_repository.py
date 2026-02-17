@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from sqlalchemy import text
 
+from app.ports.repositories import SegmentsRepositoryPort
 from app.repositories.common import build_where_clause, execute_paginated_query
 from app.repositories.session_provider import ConnectionProvider, open_connection_scope
 
@@ -195,7 +196,7 @@ def delete_segment(
     return result.rowcount > 0
 
 
-class SegmentsRepository:
+class SegmentsRepository(SegmentsRepositoryPort):
     def __init__(self, *, connection_provider: ConnectionProvider | None = None) -> None:
         self._connection_provider = connection_provider
 

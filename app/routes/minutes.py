@@ -4,9 +4,9 @@ from typing import Any
 from fastapi import APIRouter, Body, Depends, Query, Request
 
 from app.errors import http_error
+from app.ports.services import MinutesServicePort
 from app.routes.common import ERROR_RESPONSES, enforce_ingest_batch_limit
 from app.schemas import DeleteResponse, MinutesItemDetail, MinutesListResponse, MinutesUpsertPayload, UpsertResponse
-from app.services.minutes_service import MinutesService
 from app.services.providers import get_minutes_service
 
 router = APIRouter(tags=["minutes"])
@@ -34,7 +34,7 @@ def save_minutes(
             }
         ],
     ),
-    service: MinutesService = Depends(get_minutes_service),
+    service: MinutesServicePort = Depends(get_minutes_service),
 ):
     payload_items = payload if isinstance(payload, list) else [payload]
     enforce_ingest_batch_limit(request, len(payload_items))
@@ -59,7 +59,7 @@ def list_minutes(
     size: int = Query(default=20, ge=1, le=200),
     date_from: date | None = Query(default=None, alias="from"),
     date_to: date | None = Query(default=None, alias="to"),
-    service: MinutesService = Depends(get_minutes_service),
+    service: MinutesServicePort = Depends(get_minutes_service),
 ):
     rows, total = service.list_minutes(
         q=q,
@@ -82,7 +82,7 @@ def list_minutes(
     response_model=MinutesItemDetail,
     responses=ERROR_RESPONSES,
 )
-def get_minutes(item_id: int, service: MinutesService = Depends(get_minutes_service)):
+def get_minutes(item_id: int, service: MinutesServicePort = Depends(get_minutes_service)):
     row = service.get_minutes(item_id)
     if not row:
         raise http_error(404, "NOT_FOUND", "Not Found")
@@ -95,7 +95,7 @@ def get_minutes(item_id: int, service: MinutesService = Depends(get_minutes_serv
     response_model=DeleteResponse,
     responses=ERROR_RESPONSES,
 )
-def delete_minutes(item_id: int, service: MinutesService = Depends(get_minutes_service)):
+def delete_minutes(item_id: int, service: MinutesServicePort = Depends(get_minutes_service)):
     deleted = service.delete_minutes(item_id)
     if not deleted:
         raise http_error(404, "NOT_FOUND", "Not Found")

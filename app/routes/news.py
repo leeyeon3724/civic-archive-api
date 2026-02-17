@@ -4,6 +4,7 @@ from typing import Any
 from fastapi import APIRouter, Body, Depends, Query, Request
 
 from app.errors import http_error
+from app.ports.services import NewsServicePort
 from app.routes.common import ERROR_RESPONSES, enforce_ingest_batch_limit
 from app.schemas import (
     DeleteResponse,
@@ -12,7 +13,6 @@ from app.schemas import (
     NewsUpsertPayload,
     UpsertResponse,
 )
-from app.services.news_service import NewsService
 from app.services.providers import get_news_service
 
 router = APIRouter(tags=["news"])
@@ -50,7 +50,7 @@ def save_news(
             ],
         ],
     ),
-    service: NewsService = Depends(get_news_service),
+    service: NewsServicePort = Depends(get_news_service),
 ):
     payload_items = payload if isinstance(payload, list) else [payload]
     enforce_ingest_batch_limit(request, len(payload_items))
@@ -72,7 +72,7 @@ def list_news(
     size: int = Query(default=20, ge=1, le=200),
     date_from: date | None = Query(default=None, alias="from"),
     date_to: date | None = Query(default=None, alias="to"),
-    service: NewsService = Depends(get_news_service),
+    service: NewsServicePort = Depends(get_news_service),
 ):
     rows, total = service.list_articles(
         q=q,
@@ -92,7 +92,7 @@ def list_news(
     response_model=NewsItemDetail,
     responses=ERROR_RESPONSES,
 )
-def get_news(item_id: int, service: NewsService = Depends(get_news_service)):
+def get_news(item_id: int, service: NewsServicePort = Depends(get_news_service)):
     row = service.get_article(item_id)
     if not row:
         raise http_error(404, "NOT_FOUND", "Not Found")
@@ -105,7 +105,7 @@ def get_news(item_id: int, service: NewsService = Depends(get_news_service)):
     response_model=DeleteResponse,
     responses=ERROR_RESPONSES,
 )
-def delete_news(item_id: int, service: NewsService = Depends(get_news_service)):
+def delete_news(item_id: int, service: NewsServicePort = Depends(get_news_service)):
     deleted = service.delete_article(item_id)
     if not deleted:
         raise http_error(404, "NOT_FOUND", "Not Found")

@@ -3,41 +3,13 @@ from __future__ import annotations
 import hashlib
 import json
 from datetime import date, datetime
-from typing import Any, Protocol
+from typing import Any
 
+from app.ports.repositories import SegmentsRepositoryPort
+from app.ports.services import SegmentsServicePort
 from app.repositories.segments_repository import SegmentsRepository
 from app.repositories.session_provider import ConnectionProvider
 from app.utils import bad_request, combine_meeting_no, parse_date
-
-
-class SegmentsRepositoryPort(Protocol):
-    def insert_segments(self, items: list[dict[str, Any]]) -> int:
-        ...
-
-    def list_segments(
-        self,
-        *,
-        q: str | None,
-        council: str | None,
-        committee: str | None,
-        session: str | None,
-        meeting_no: str | None,
-        importance: int | None,
-        party: str | None,
-        constituency: str | None,
-        department: str | None,
-        date_from: str | None,
-        date_to: str | None,
-        page: int,
-        size: int,
-    ) -> tuple[list[dict[str, Any]], int]:
-        ...
-
-    def get_segment(self, item_id: int) -> dict[str, Any] | None:
-        ...
-
-    def delete_segment(self, item_id: int) -> bool:
-        ...
 
 
 def _canonical_json_value(value: Any) -> Any:
@@ -150,7 +122,7 @@ def parse_importance_query(raw: str | None) -> int | None:
     return value
 
 
-class SegmentsService:
+class SegmentsService(SegmentsServicePort):
     def __init__(self, *, repository: SegmentsRepositoryPort) -> None:
         self._repository = repository
 
@@ -204,7 +176,7 @@ def build_segments_service(
     *,
     repository: SegmentsRepositoryPort | None = None,
     connection_provider: ConnectionProvider | None = None,
-) -> SegmentsService:
+) -> SegmentsServicePort:
     selected_repository = repository or SegmentsRepository(connection_provider=connection_provider)
     return SegmentsService(repository=selected_repository)
 
@@ -216,7 +188,7 @@ def normalize_segment(item: dict[str, Any]) -> dict[str, Any]:
 def insert_segments(
     items: list[dict[str, Any]],
     *,
-    service: SegmentsService | None = None,
+    service: SegmentsServicePort | None = None,
     connection_provider: ConnectionProvider | None = None,
 ) -> int:
     active_service = service or build_segments_service(connection_provider=connection_provider)
@@ -238,7 +210,7 @@ def list_segments(
     date_to: str | None,
     page: int,
     size: int,
-    service: SegmentsService | None = None,
+    service: SegmentsServicePort | None = None,
     connection_provider: ConnectionProvider | None = None,
 ) -> tuple[list[dict[str, Any]], int]:
     active_service = service or build_segments_service(connection_provider=connection_provider)
@@ -262,7 +234,7 @@ def list_segments(
 def get_segment(
     item_id: int,
     *,
-    service: SegmentsService | None = None,
+    service: SegmentsServicePort | None = None,
     connection_provider: ConnectionProvider | None = None,
 ) -> dict[str, Any] | None:
     active_service = service or build_segments_service(connection_provider=connection_provider)
@@ -272,7 +244,7 @@ def get_segment(
 def delete_segment(
     item_id: int,
     *,
-    service: SegmentsService | None = None,
+    service: SegmentsServicePort | None = None,
     connection_provider: ConnectionProvider | None = None,
 ) -> bool:
     active_service = service or build_segments_service(connection_provider=connection_provider)
