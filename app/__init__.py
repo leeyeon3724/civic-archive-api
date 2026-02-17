@@ -99,6 +99,7 @@ def create_app(config=None):
     @api.middleware("http")
     async def request_size_guard(request: Request, call_next):
         if request.url.path.startswith("/api/") and request.method in {"POST", "PUT", "PATCH"}:
+            max_request_body_bytes = int(config.MAX_REQUEST_BODY_BYTES)
             content_length_raw = (request.headers.get("content-length") or "").strip()
             if content_length_raw:
                 try:
@@ -110,17 +111,39 @@ def create_app(config=None):
                         code="BAD_REQUEST",
                         message="Invalid Content-Length header",
                     )
-                if content_length > int(config.MAX_REQUEST_BODY_BYTES):
+                if content_length > max_request_body_bytes:
                     return error_response(
                         request,
                         status_code=413,
                         code="PAYLOAD_TOO_LARGE",
                         message="Payload Too Large",
                         details={
-                            "max_request_body_bytes": int(config.MAX_REQUEST_BODY_BYTES),
+                            "max_request_body_bytes": max_request_body_bytes,
                             "content_length": content_length,
                         },
                     )
+            body = await request.body()
+            body_size = len(body)
+            if body_size > max_request_body_bytes:
+                details = {
+                    "max_request_body_bytes": max_request_body_bytes,
+                    "request_body_bytes": body_size,
+                }
+                if content_length_raw:
+                    details["content_length"] = int(content_length_raw)
+                return error_response(
+                    request,
+                    status_code=413,
+                    code="PAYLOAD_TOO_LARGE",
+                    message="Payload Too Large",
+                    details=details,
+                )
+
+            # Re-inject the buffered body so downstream handlers can parse JSON normally.
+            async def _receive() -> dict:
+                return {"type": "http.request", "body": body, "more_body": False}
+
+            request._receive = _receive  # type: ignore[attr-defined]
         return await call_next(request)
 
     init_db(
@@ -193,6 +216,7 @@ def create_app(config=None):
             400: {"model": ErrorResponse},
             401: {"model": ErrorResponse},
             403: {"model": ErrorResponse},
+            413: {"model": ErrorResponse},
             429: {"model": ErrorResponse},
             500: {"model": ErrorResponse},
         },
