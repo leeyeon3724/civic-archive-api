@@ -62,7 +62,8 @@ PR 본문에 아래 항목을 포함합니다.
 ## 머지 전 필수 검증
 
 - `python scripts/check_commit_messages.py --rev-range origin/main..HEAD --mode fail`
-- `python -m pytest -q -m "not e2e and not integration"`
+- `python -m ruff check app tests scripts`
+- `python -m pytest -q -m "not e2e and not integration" --cov=app --cov-report=term --cov-fail-under=85`
 - `python scripts/check_docs_routes.py`
 - `python scripts/check_schema_policy.py`
 - `python scripts/check_version_consistency.py`

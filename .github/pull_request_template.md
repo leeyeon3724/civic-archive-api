@@ -18,7 +18,8 @@
 ## 기본 체크리스트
 
 - [ ] `python scripts/check_commit_messages.py --rev-range origin/main..HEAD --mode fail` 실행
-- [ ] `python -m pytest -q -m "not e2e and not integration"` 실행
+- [ ] `python -m ruff check app tests scripts` 실행
+- [ ] `python -m pytest -q -m "not e2e and not integration" --cov=app --cov-report=term --cov-fail-under=85` 실행
 - [ ] `python scripts/check_docs_routes.py` 실행
 - [ ] `python scripts/check_schema_policy.py` 실행
 - [ ] 동작/API 변경 시 문서 업데이트

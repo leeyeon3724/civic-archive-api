@@ -28,6 +28,7 @@
 - 관측성 라벨 정확도 회귀 테스트 추가 (`tests/test_observability_labels.py`)
 - 통합 테스트 범위 확장 (`tests/test_integration_postgres.py`: JWT runtime 경로, payload guard `413`, metrics label 검증)
 - e2e 도달성 검사 기반 skip 가드 추가 (`tests/test_e2e.py`)
+- P7 엔지니어링 품질 강화 백로그 추가 (`docs/REFACTOR_BACKLOG.md`)
 
 ### 변경됨
 
@@ -48,6 +49,10 @@
 - 운영/성능/백로그 문서의 벤치마크 명령 및 상태 표기를 정합성 기준에 맞게 정리
 - 요청 본문 상한 가드를 스트리밍 누적 방식으로 조정해 미들웨어 full-body preload를 제거하고 초과 시 `413` 응답을 보장
 - payload guard 등 pre-route 실패 케이스에서도 metrics path 라벨이 라우트 템플릿(`/api/echo`)로 집계되도록 조정
+- DB 연결 문자열 생성을 SQLAlchemy URL builder 기반으로 전환해 특수문자 credentials 파싱 안전성 강화
+- `GET /api/news`의 `to` 날짜 경계 필터를 일 단위 inclusive semantics로 조정
+- CI 품질 게이트에 `ruff` 린트 및 `pytest --cov --cov-fail-under=85` 커버리지 하한을 추가
+- 기여/운영/SLO 문서의 검증 명령을 lint/coverage 게이트 기준으로 정합화
 
 ### 수정됨
 

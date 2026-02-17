@@ -126,6 +126,12 @@ python -m alembic downgrade -1
 ## 품질 게이트
 
 ```bash
+# 린트 검사
+python -m ruff check app tests scripts
+
+# unit/contract 테스트 + 커버리지 하한
+python -m pytest -q -m "not e2e and not integration" --cov=app --cov-report=term --cov-fail-under=85
+
 # 커밋 메시지 정책 검사 (브랜치 기준)
 python scripts/check_commit_messages.py --rev-range origin/main..HEAD --mode fail
 

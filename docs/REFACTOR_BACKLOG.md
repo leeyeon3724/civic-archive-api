@@ -15,6 +15,7 @@
 | P4 | SLO and observability ops | SLI/SLO, error budget policy, alert policy | Completed |
 | P5 | Performance and scalability baseline | DB pool/runtime timeout tuning, query latency guardrails | Completed |
 | P6 | Runtime verification hardening | streaming request guard, observability label accuracy, integration/e2e reliability | Completed |
+| P7 | Engineering quality hardening | config safety, query correctness, quality gates uplift | In Progress |
 
 ## P1 Backlog (Current Scope)
 
@@ -214,4 +215,44 @@
 - Schema policy check passes
 - Version consistency check passes
 - SLO policy check passes
+- `docs/CHANGELOG.md` updated
+
+## P7 Backlog (Current Scope)
+
+### 1) Configuration Safety Hardening
+
+- [x] Build DB connection URL with safe encoding for credentials containing reserved characters
+- [x] Add regression test for special-character password parsing correctness
+
+### 2) Query Correctness Hardening
+
+- [x] Fix `GET /api/news` date range boundary behavior to keep `to` filter inclusive at day granularity
+- [x] Add regression coverage for same-day (`from == to`) news filtering
+
+### 3) Quality Gates Uplift
+
+- [x] Add lint gate (`ruff check`) to CI
+- [x] Add coverage gate (`pytest --cov --cov-fail-under`) to CI
+- [x] Remove current lint violations from scripts/tests
+- [x] Phase-1 mypy rollout plan definition (non-blocking baseline)
+  - scope: `app/config.py`, `app/security.py`, `scripts/*` 우선 적용
+  - rollout: CI `warn` 모드로 1차 도입 후 모듈별 오탐 정리 뒤 `fail` 승격
+
+### 4) Maintainability Refactor Preparation
+
+- [x] Define `create_app()` decomposition target modules (validation/middleware/routes/handlers)
+  - target modules: `app/bootstrap/validation.py`, `app/bootstrap/middleware.py`, `app/bootstrap/routes.py`, `app/bootstrap/errors.py`
+- [x] Identify global engine dependency migration path for DI/session factory
+  - path: `database.engine` 직접 참조 -> `session factory/provider` 도입 -> repository 의존성 주입 전환
+
+## Definition of Done (P7-Current)
+
+- Unit/contract tests pass
+- Integration tests pass (`RUN_INTEGRATION=1`)
+- Docs-route contract check passes
+- Schema policy check passes
+- Version consistency check passes
+- SLO policy check passes
+- Lint gate (`ruff`) passes
+- Coverage gate (`--cov-fail-under`) passes
 - `docs/CHANGELOG.md` updated
