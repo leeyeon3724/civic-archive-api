@@ -281,7 +281,8 @@
 - [x] Prepare phased migration plan: global engine -> provider -> repository injection
   - phase 1 (completed): `app/repositories/session_provider.py` default provider wraps global engine scope
   - phase 2 (completed): repository functions support optional injected `connection_provider`
-  - phase 3 (next): service layer constructor/provider injection to eliminate module-level repository calls
+  - phase 3 (completed): service layer constructor/provider injection + route `Depends` wiring
+  - test migration (completed): endpoint tests use dependency override fixture for service DI
 
 ## Definition of Done (P8-Current)
 

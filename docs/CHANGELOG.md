@@ -32,6 +32,7 @@
 - P8 아키텍처 분해 백로그 추가 (`docs/REFACTOR_BACKLOG.md`)
 - bootstrap 경계 전용 계약 테스트 추가 (`tests/test_bootstrap_boundaries.py`)
 - repository 세션 provider/DI 계약 테스트 추가 (`tests/test_repository_session_provider.py`)
+- 서비스 DI override fixture 추가 (`tests/conftest.py`: `override_dependency`)
 
 ### 변경됨
 
@@ -60,6 +61,8 @@
 - 아키텍처 문서에 bootstrap 경계와 초기화 조합 흐름을 반영
 - bootstrap 경계의 DI 계약을 명시하고 `register_domain_routes`/`register_system_routes` 단위 테스트로 고정
 - repository 계층의 DB 접근을 `session_provider` 추상화로 전환하고 optional `connection_provider` 주입 경로를 추가
+- 서비스 계층을 생성자/팩토리 기반 DI로 전환하고 라우트에서 `Depends(get_*_service)` 주입을 사용
+- endpoint 테스트를 monkeypatch 기반에서 dependency override 기반으로 일원화
 
 ### 수정됨
 
