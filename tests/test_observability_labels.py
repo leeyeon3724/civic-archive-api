@@ -1,10 +1,9 @@
 from unittest.mock import patch
 
 from fastapi.testclient import TestClient
-from conftest import StubResult
+from conftest import StubResult, build_test_config
 
 from app import create_app
-from app.config import Config
 
 
 def _metric_counter_value(metrics_text: str, *, method: str, path: str, status_code: str) -> float:
@@ -21,7 +20,7 @@ def _metric_counter_value(metrics_text: str, *, method: str, path: str, status_c
 
 def test_metrics_uses_route_template_label_for_payload_guard_failure(make_engine):
     with patch("app.database.create_engine", return_value=make_engine(lambda *_: StubResult())):
-        app = create_app(Config(MAX_REQUEST_BODY_BYTES=64))
+        app = create_app(build_test_config(MAX_REQUEST_BODY_BYTES=64))
 
     with TestClient(app) as tc:
         before_metrics = tc.get("/metrics")

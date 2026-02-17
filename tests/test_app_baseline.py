@@ -7,13 +7,12 @@ import time
 from unittest.mock import patch
 
 import pytest
-from conftest import StubEngine, StubResult
+from conftest import StubEngine, StubResult, build_test_config
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from sqlalchemy.engine import make_url
 
 from app import create_app
-from app.config import Config
 from app.services.providers import get_news_service
 from app.version import APP_VERSION
 
@@ -321,7 +320,7 @@ def test_openapi_version_uses_app_version_constant(client):
 
 
 def test_database_url_preserves_special_character_credentials():
-    config = Config(
+    config = build_test_config(
         POSTGRES_HOST="db.internal",
         POSTGRES_PORT=5432,
         POSTGRES_USER="app-user",
@@ -336,10 +335,20 @@ def test_database_url_preserves_special_character_credentials():
     assert parsed.database == "archive"
 
 
+def test_build_test_config_is_deterministic_against_env(monkeypatch):
+    monkeypatch.setenv("REQUIRE_API_KEY", "1")
+    monkeypatch.setenv("POSTGRES_PASSWORD", "env-secret")
+
+    config = build_test_config()
+
+    assert config.REQUIRE_API_KEY is False
+    assert config.POSTGRES_PASSWORD == "change_me"
+
+
 def test_api_key_required_for_protected_endpoint(make_engine):
     with patch("app.database.create_engine", return_value=make_engine(lambda *_: StubResult())):
         app = create_app(
-            Config(
+            build_test_config(
                 REQUIRE_API_KEY=True,
                 API_KEY="top-secret",
             )
@@ -372,7 +381,7 @@ def test_jwt_required_for_protected_endpoint(make_engine):
 
     with patch("app.database.create_engine", return_value=make_engine(lambda *_: StubResult())):
         app = create_app(
-            Config(
+            build_test_config(
                 REQUIRE_JWT=True,
                 JWT_SECRET=secret,
             )
@@ -410,7 +419,7 @@ def test_jwt_forbidden_without_required_scope(make_engine):
 
     with patch("app.database.create_engine", return_value=make_engine(lambda *_: StubResult())):
         app = create_app(
-            Config(
+            build_test_config(
                 REQUIRE_JWT=True,
                 JWT_SECRET=secret,
             )
@@ -440,7 +449,7 @@ def test_jwt_admin_role_bypasses_scope_checks(make_engine):
 
     with patch("app.database.create_engine", return_value=make_engine(lambda *_: StubResult())):
         app = create_app(
-            Config(
+            build_test_config(
                 REQUIRE_JWT=True,
                 JWT_SECRET=secret,
             )
@@ -475,7 +484,7 @@ def test_jwt_rejects_tokens_missing_required_sub_or_exp(make_engine):
 
     with patch("app.database.create_engine", return_value=make_engine(lambda *_: StubResult())):
         app = create_app(
-            Config(
+            build_test_config(
                 REQUIRE_JWT=True,
                 JWT_SECRET=secret,
             )
@@ -513,7 +522,7 @@ def test_jwt_leeway_allows_slightly_expired_token(make_engine):
 
     with patch("app.database.create_engine", return_value=make_engine(lambda *_: StubResult())):
         app = create_app(
-            Config(
+            build_test_config(
                 REQUIRE_JWT=True,
                 JWT_SECRET=secret,
                 JWT_LEEWAY_SECONDS=5,
@@ -534,7 +543,7 @@ def test_jwt_configuration_requires_secret(make_engine):
     with patch("app.database.create_engine", return_value=make_engine(lambda *_: StubResult())):
         with pytest.raises(RuntimeError):
             create_app(
-                Config(
+                build_test_config(
                     REQUIRE_JWT=True,
                     JWT_SECRET=None,
                 )
@@ -545,7 +554,7 @@ def test_jwt_algorithm_must_be_hs256(make_engine):
     with patch("app.database.create_engine", return_value=make_engine(lambda *_: StubResult())):
         with pytest.raises(RuntimeError):
             create_app(
-                Config(
+                build_test_config(
                     REQUIRE_JWT=True,
                     JWT_SECRET="test-secret-0123456789abcdefghijkl",
                     JWT_ALGORITHM="RS256",
@@ -557,7 +566,7 @@ def test_jwt_leeway_must_be_non_negative(make_engine):
     with patch("app.database.create_engine", return_value=make_engine(lambda *_: StubResult())):
         with pytest.raises(RuntimeError, match="JWT_LEEWAY_SECONDS must be greater than or equal to 0."):
             create_app(
-                Config(
+                build_test_config(
                     REQUIRE_JWT=True,
                     JWT_SECRET="test-secret-0123456789abcdefghijkl",
                     JWT_LEEWAY_SECONDS=-1,
@@ -569,7 +578,7 @@ def test_strict_security_mode_requires_authentication(make_engine):
     with patch("app.database.create_engine", return_value=make_engine(lambda *_: StubResult())):
         with pytest.raises(RuntimeError):
             create_app(
-                Config(
+                build_test_config(
                     SECURITY_STRICT_MODE=True,
                     ALLOWED_HOSTS="api.example.com",
                     CORS_ALLOW_ORIGINS="https://app.example.com",
@@ -582,7 +591,7 @@ def test_strict_security_mode_rejects_wildcard_allowed_hosts(make_engine):
     with patch("app.database.create_engine", return_value=make_engine(lambda *_: StubResult())):
         with pytest.raises(RuntimeError):
             create_app(
-                Config(
+                build_test_config(
                     SECURITY_STRICT_MODE=True,
                     REQUIRE_API_KEY=True,
                     API_KEY="strict-key",
@@ -597,7 +606,7 @@ def test_strict_security_mode_rejects_wildcard_cors(make_engine):
     with patch("app.database.create_engine", return_value=make_engine(lambda *_: StubResult())):
         with pytest.raises(RuntimeError):
             create_app(
-                Config(
+                build_test_config(
                     SECURITY_STRICT_MODE=True,
                     REQUIRE_API_KEY=True,
                     API_KEY="strict-key",
@@ -612,7 +621,7 @@ def test_strict_security_mode_requires_positive_rate_limit(make_engine):
     with patch("app.database.create_engine", return_value=make_engine(lambda *_: StubResult())):
         with pytest.raises(RuntimeError):
             create_app(
-                Config(
+                build_test_config(
                     SECURITY_STRICT_MODE=True,
                     REQUIRE_API_KEY=True,
                     API_KEY="strict-key",
@@ -627,7 +636,7 @@ def test_production_env_enables_strict_security_mode(make_engine):
     with patch("app.database.create_engine", return_value=make_engine(lambda *_: StubResult())):
         with pytest.raises(RuntimeError):
             create_app(
-                Config(
+                build_test_config(
                     APP_ENV="production",
                 )
             )
@@ -636,7 +645,7 @@ def test_production_env_enables_strict_security_mode(make_engine):
 def test_strict_security_mode_accepts_secure_configuration(make_engine):
     with patch("app.database.create_engine", return_value=make_engine(lambda *_: StubResult())):
         app = create_app(
-            Config(
+            build_test_config(
                 SECURITY_STRICT_MODE=True,
                 REQUIRE_API_KEY=True,
                 API_KEY="strict-key",
@@ -651,7 +660,7 @@ def test_strict_security_mode_accepts_secure_configuration(make_engine):
 def test_rate_limit_enforced_for_protected_endpoint(make_engine):
     with patch("app.database.create_engine", return_value=make_engine(lambda *_: StubResult())):
         app = create_app(
-            Config(
+            build_test_config(
                 RATE_LIMIT_PER_MINUTE=1,
             )
         )
@@ -671,7 +680,7 @@ def test_rate_limit_enforced_for_protected_endpoint(make_engine):
 def test_rate_limit_uses_xff_when_proxy_is_trusted(make_engine):
     with patch("app.database.create_engine", return_value=make_engine(lambda *_: StubResult())):
         app = create_app(
-            Config(
+            build_test_config(
                 RATE_LIMIT_PER_MINUTE=1,
                 TRUSTED_PROXY_CIDRS="127.0.0.1/32",
             )
@@ -687,7 +696,7 @@ def test_rate_limit_uses_xff_when_proxy_is_trusted(make_engine):
 def test_rate_limit_ignores_xff_when_proxy_is_untrusted(make_engine):
     with patch("app.database.create_engine", return_value=make_engine(lambda *_: StubResult())):
         app = create_app(
-            Config(
+            build_test_config(
                 RATE_LIMIT_PER_MINUTE=1,
                 TRUSTED_PROXY_CIDRS="10.0.0.0/8",
             )
@@ -705,7 +714,7 @@ def test_invalid_trusted_proxy_cidrs_are_rejected(make_engine):
     with patch("app.database.create_engine", return_value=make_engine(lambda *_: StubResult())):
         with pytest.raises(RuntimeError):
             create_app(
-                Config(
+                build_test_config(
                     RATE_LIMIT_PER_MINUTE=1,
                     TRUSTED_PROXY_CIDRS="not-a-cidr",
                 )
@@ -716,7 +725,7 @@ def test_rate_limit_backend_rejects_invalid_value(make_engine):
     with patch("app.database.create_engine", return_value=make_engine(lambda *_: StubResult())):
         with pytest.raises(RuntimeError):
             create_app(
-                Config(
+                build_test_config(
                     RATE_LIMIT_BACKEND="invalid-backend",
                     RATE_LIMIT_PER_MINUTE=1,
                 )
@@ -727,7 +736,7 @@ def test_rate_limit_redis_backend_requires_redis_url(make_engine):
     with patch("app.database.create_engine", return_value=make_engine(lambda *_: StubResult())):
         with pytest.raises(RuntimeError):
             create_app(
-                Config(
+                build_test_config(
                     RATE_LIMIT_BACKEND="redis",
                     RATE_LIMIT_PER_MINUTE=1,
                     REDIS_URL=None,
@@ -739,7 +748,7 @@ def test_rate_limit_redis_failure_cooldown_must_be_positive(make_engine):
     with patch("app.database.create_engine", return_value=make_engine(lambda *_: StubResult())):
         with pytest.raises(RuntimeError):
             create_app(
-                Config(
+                build_test_config(
                     RATE_LIMIT_REDIS_FAILURE_COOLDOWN_SECONDS=0,
                 )
             )
@@ -777,7 +786,7 @@ def test_rate_limit_redis_backend_is_usable_with_custom_limiter(make_engine):
         FakeRedisRateLimiter,
     ):
         app = create_app(
-            Config(
+            build_test_config(
                 RATE_LIMIT_BACKEND="redis",
                 REDIS_URL="redis://localhost:6379/0",
                 RATE_LIMIT_REDIS_PREFIX="test-prefix",
@@ -806,7 +815,7 @@ def test_create_app_applies_database_runtime_tuning():
 
     with patch("app.database.create_engine", side_effect=fake_create_engine):
         app = create_app(
-            Config(
+            build_test_config(
                 DB_POOL_SIZE=7,
                 DB_MAX_OVERFLOW=13,
                 DB_POOL_TIMEOUT_SECONDS=11,
@@ -842,12 +851,12 @@ def test_create_app_applies_database_runtime_tuning():
 )
 def test_create_app_rejects_invalid_database_runtime_tuning(config_overrides, expected_message):
     with pytest.raises(RuntimeError, match=expected_message):
-        create_app(Config(**config_overrides))
+        create_app(build_test_config(**config_overrides))
 
 
 def test_ingest_batch_limit_rejects_oversized_payload(make_engine):
     with patch("app.database.create_engine", return_value=make_engine(lambda *_: StubResult())):
-        app = create_app(Config(INGEST_MAX_BATCH_ITEMS=1))
+        app = create_app(build_test_config(INGEST_MAX_BATCH_ITEMS=1))
 
     with TestClient(app) as tc:
         response = tc.post(
@@ -867,7 +876,7 @@ def test_ingest_batch_limit_rejects_oversized_payload(make_engine):
 
 def test_request_size_guard_rejects_large_content_length(make_engine):
     with patch("app.database.create_engine", return_value=make_engine(lambda *_: StubResult())):
-        app = create_app(Config(MAX_REQUEST_BODY_BYTES=64))
+        app = create_app(build_test_config(MAX_REQUEST_BODY_BYTES=64))
 
     with TestClient(app) as tc:
         body = '{"payload":"' + ("x" * 200) + '"}'
@@ -886,7 +895,7 @@ def test_request_size_guard_rejects_large_content_length(make_engine):
 
 def test_request_size_guard_rejects_oversized_streaming_body_without_reliable_content_length(make_engine):
     with patch("app.database.create_engine", return_value=make_engine(lambda *_: StubResult())):
-        app = create_app(Config(MAX_REQUEST_BODY_BYTES=64))
+        app = create_app(build_test_config(MAX_REQUEST_BODY_BYTES=64))
 
     def payload_chunks():
         yield b'{"payload":"'

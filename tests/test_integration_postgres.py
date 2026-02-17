@@ -8,11 +8,11 @@ import os
 import time
 
 import pytest
+from conftest import build_test_config
 from fastapi.testclient import TestClient
 from sqlalchemy import text
 
 from app import create_app
-from app.config import Config
 
 pytestmark = pytest.mark.integration
 
@@ -52,7 +52,7 @@ def _metric_counter_value(metrics_text: str, *, method: str, path: str, status_c
 @pytest.fixture(scope="session")
 def integration_client():
     _skip_if_not_enabled()
-    app = create_app(Config())
+    app = create_app(build_test_config())
     with TestClient(app) as client:
         yield client
 
@@ -268,7 +268,7 @@ def test_runtime_jwt_authorization_path():
             "exp": now + 300,
         },
     )
-    app = create_app(Config(REQUIRE_JWT=True, JWT_SECRET=secret))
+    app = create_app(build_test_config(REQUIRE_JWT=True, JWT_SECRET=secret))
     with TestClient(app) as client:
         unauthorized = client.post("/api/echo", json={"hello": "world"})
         assert unauthorized.status_code == 401
@@ -293,7 +293,7 @@ def test_runtime_jwt_authorization_path():
 
 def test_payload_guard_returns_standard_413_shape():
     _skip_if_not_enabled()
-    app = create_app(Config(MAX_REQUEST_BODY_BYTES=64))
+    app = create_app(build_test_config(MAX_REQUEST_BODY_BYTES=64))
     with TestClient(app) as client:
         body = '{"payload":"' + ("x" * 200) + '"}'
         response = client.post(
@@ -314,7 +314,7 @@ def test_payload_guard_returns_standard_413_shape():
 
 def test_metrics_label_for_guard_failure_uses_route_template():
     _skip_if_not_enabled()
-    app = create_app(Config(MAX_REQUEST_BODY_BYTES=64))
+    app = create_app(build_test_config(MAX_REQUEST_BODY_BYTES=64))
     with TestClient(app) as client:
         before = client.get("/metrics")
         assert before.status_code == 200

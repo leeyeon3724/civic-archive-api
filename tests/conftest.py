@@ -4,6 +4,8 @@ from unittest.mock import patch
 import pytest
 from fastapi.testclient import TestClient
 
+from app.config import Config
+
 
 def pytest_addoption(parser):
     parser.addoption(
@@ -16,6 +18,26 @@ def pytest_addoption(parser):
 def pytest_configure(config):
     config.addinivalue_line("markers", "e2e: 라이브 서버 대상 E2E 테스트")
     config.addinivalue_line("markers", "integration: PostgreSQL 컨테이너 기반 통합 테스트")
+
+
+def build_test_config(**overrides: Any) -> Config:
+    defaults: dict[str, Any] = {
+        "APP_ENV": "test",
+        "LOG_LEVEL": "WARNING",
+        "LOG_JSON": False,
+        "POSTGRES_HOST": "127.0.0.1",
+        "POSTGRES_PORT": 5432,
+        "POSTGRES_USER": "app_user",
+        "POSTGRES_PASSWORD": "change_me",
+        "POSTGRES_DB": "civic_archive",
+        "REQUIRE_API_KEY": False,
+        "REQUIRE_JWT": False,
+        "RATE_LIMIT_PER_MINUTE": 0,
+        "RATE_LIMIT_BACKEND": "memory",
+        "SECURITY_STRICT_MODE": False,
+    }
+    defaults.update(overrides)
+    return Config(_env_file=None, **defaults)
 
 
 class StubResult:
@@ -130,7 +152,7 @@ def app_instance():
     with patch("app.database.create_engine", return_value=import_engine):
         from app import create_app
 
-        api = create_app()
+        api = create_app(build_test_config())
     api._bootstrap_engine_for_test = import_engine
     return api
 

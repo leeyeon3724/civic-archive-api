@@ -1,6 +1,7 @@
 import logging
 
 import pytest
+from conftest import build_test_config
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.testclient import TestClient
 
@@ -10,12 +11,11 @@ from app.bootstrap.middleware import register_core_middleware
 from app.bootstrap.routes import register_domain_routes
 from app.bootstrap.system_routes import register_system_routes
 from app.bootstrap.validation import validate_startup_config
-from app.config import Config
 
 
 def test_validation_module_rejects_invalid_rate_limit_backend():
     with pytest.raises(RuntimeError, match="RATE_LIMIT_BACKEND must be one of: memory, redis."):
-        validate_startup_config(Config(RATE_LIMIT_BACKEND="invalid"))
+        validate_startup_config(build_test_config(RATE_LIMIT_BACKEND="invalid"))
 
 
 def test_routes_module_forwards_protected_dependencies(monkeypatch):
@@ -36,7 +36,7 @@ def test_routes_module_forwards_protected_dependencies(monkeypatch):
 
 def test_middleware_module_enforces_request_size_guard():
     api = FastAPI()
-    register_core_middleware(api, Config(MAX_REQUEST_BODY_BYTES=64))
+    register_core_middleware(api, build_test_config(MAX_REQUEST_BODY_BYTES=64))
 
     @api.get("/status")
     async def status():
@@ -66,7 +66,7 @@ def test_system_routes_module_readiness_and_echo():
     api = FastAPI()
     register_system_routes(
         api,
-        config=Config(),
+        config=build_test_config(),
         protected_dependencies=[],
         db_health_check=lambda: (True, None),
         rate_limit_health_check=lambda: (False, "redis down"),
