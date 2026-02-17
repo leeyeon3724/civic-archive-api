@@ -8,7 +8,7 @@ from typing import Any
 from app.ports.repositories import SegmentsRepositoryPort
 from app.ports.services import SegmentsServicePort
 from app.repositories.segments_repository import SegmentsRepository
-from app.repositories.session_provider import ConnectionProvider
+from app.repositories.session_provider import ConnectionProvider, ensure_connection_provider
 from app.utils import bad_request, combine_meeting_no, parse_date
 
 
@@ -174,8 +174,8 @@ class SegmentsService(SegmentsServicePort):
 
 def build_segments_service(
     *,
+    connection_provider: ConnectionProvider,
     repository: SegmentsRepositoryPort | None = None,
-    connection_provider: ConnectionProvider | None = None,
 ) -> SegmentsServicePort:
     selected_repository = repository or SegmentsRepository(connection_provider=connection_provider)
     return SegmentsService(repository=selected_repository)
@@ -191,7 +191,7 @@ def insert_segments(
     service: SegmentsServicePort | None = None,
     connection_provider: ConnectionProvider | None = None,
 ) -> int:
-    active_service = service or build_segments_service(connection_provider=connection_provider)
+    active_service = service or build_segments_service(connection_provider=ensure_connection_provider(connection_provider))
     return active_service.insert_segments(items)
 
 
@@ -213,7 +213,7 @@ def list_segments(
     service: SegmentsServicePort | None = None,
     connection_provider: ConnectionProvider | None = None,
 ) -> tuple[list[dict[str, Any]], int]:
-    active_service = service or build_segments_service(connection_provider=connection_provider)
+    active_service = service or build_segments_service(connection_provider=ensure_connection_provider(connection_provider))
     return active_service.list_segments(
         q=q,
         council=council,
@@ -237,7 +237,7 @@ def get_segment(
     service: SegmentsServicePort | None = None,
     connection_provider: ConnectionProvider | None = None,
 ) -> dict[str, Any] | None:
-    active_service = service or build_segments_service(connection_provider=connection_provider)
+    active_service = service or build_segments_service(connection_provider=ensure_connection_provider(connection_provider))
     return active_service.get_segment(item_id)
 
 
@@ -247,5 +247,5 @@ def delete_segment(
     service: SegmentsServicePort | None = None,
     connection_provider: ConnectionProvider | None = None,
 ) -> bool:
-    active_service = service or build_segments_service(connection_provider=connection_provider)
+    active_service = service or build_segments_service(connection_provider=ensure_connection_provider(connection_provider))
     return active_service.delete_segment(item_id)

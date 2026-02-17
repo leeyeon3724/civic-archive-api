@@ -1,72 +1,94 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
-import json
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from sqlalchemy import text
 
 from app.ports.repositories import NewsRepositoryPort
-from app.repositories.common import accumulate_upsert_result, build_where_clause, execute_paginated_query
+from app.repositories.common import build_where_clause, execute_paginated_query, to_json_recordset
 from app.repositories.session_provider import ConnectionProvider, open_connection_scope
 
 
 def upsert_articles(
-    articles: List[Dict[str, Any]],
+    articles: list[dict[str, Any]],
     *,
-    connection_provider: ConnectionProvider | None = None,
-) -> Tuple[int, int]:
-    inserted = 0
-    updated = 0
+    connection_provider: ConnectionProvider,
+) -> tuple[int, int]:
+    if not articles:
+        return 0, 0
+
+    payload_rows = [
+        {
+            "source": article.get("source"),
+            "title": article.get("title"),
+            "url": article.get("url"),
+            "published_at": article.get("published_at"),
+            "author": article.get("author"),
+            "summary": article.get("summary"),
+            "content": article.get("content"),
+            "keywords": article.get("keywords"),
+        }
+        for article in articles
+    ]
 
     sql = text(
         """
-        INSERT INTO news_articles
-          (source, title, url, published_at, author, summary, content, keywords)
-        VALUES
-          (:source, :title, :url, :published_at, :author, :summary, :content, CAST(:keywords AS jsonb))
-        ON CONFLICT (url) DO UPDATE SET
-          source = EXCLUDED.source,
-          title = EXCLUDED.title,
-          published_at = EXCLUDED.published_at,
-          author = EXCLUDED.author,
-          summary = EXCLUDED.summary,
-          content = EXCLUDED.content,
-          keywords = EXCLUDED.keywords,
-          updated_at = CURRENT_TIMESTAMP
-        RETURNING (xmax = 0) AS inserted
+        WITH payload AS (
+            SELECT *
+            FROM jsonb_to_recordset(CAST(:items AS jsonb))
+              AS p(
+                source text,
+                title text,
+                url text,
+                published_at timestamptz,
+                author text,
+                summary text,
+                content text,
+                keywords jsonb
+              )
+        ),
+        upserted AS (
+            INSERT INTO news_articles
+              (source, title, url, published_at, author, summary, content, keywords)
+            SELECT
+              source, title, url, published_at, author, summary, content, keywords
+            FROM payload
+            ON CONFLICT (url) DO UPDATE SET
+              source = EXCLUDED.source,
+              title = EXCLUDED.title,
+              published_at = EXCLUDED.published_at,
+              author = EXCLUDED.author,
+              summary = EXCLUDED.summary,
+              content = EXCLUDED.content,
+              keywords = EXCLUDED.keywords,
+              updated_at = CURRENT_TIMESTAMP
+            RETURNING (xmax = 0) AS inserted
+        )
+        SELECT
+          COALESCE(SUM(CASE WHEN inserted THEN 1 ELSE 0 END), 0) AS inserted,
+          COALESCE(SUM(CASE WHEN NOT inserted THEN 1 ELSE 0 END), 0) AS updated
+        FROM upserted
         """
     )
 
     with open_connection_scope(connection_provider) as conn:
-        for article in articles:
-            params = {
-                "source": article.get("source"),
-                "title": article.get("title"),
-                "url": article.get("url"),
-                "published_at": article.get("published_at"),
-                "author": article.get("author"),
-                "summary": article.get("summary"),
-                "content": article.get("content"),
-                "keywords": json.dumps(article.get("keywords")) if article.get("keywords") is not None else None,
-            }
-            result = conn.execute(sql, params)
-            inserted, updated = accumulate_upsert_result(result, inserted=inserted, updated=updated)
+        row = conn.execute(sql, {"items": to_json_recordset(payload_rows)}).mappings().first() or {}
 
-    return inserted, updated
+    return int(row.get("inserted") or 0), int(row.get("updated") or 0)
 
 
 def list_articles(
     *,
-    q: Optional[str],
-    source: Optional[str],
-    date_from: Optional[str],
-    date_to: Optional[str],
+    q: str | None,
+    source: str | None,
+    date_from: str | None,
+    date_to: str | None,
     page: int,
     size: int,
-    connection_provider: ConnectionProvider | None = None,
-) -> Tuple[List[Dict[str, Any]], int]:
+    connection_provider: ConnectionProvider,
+) -> tuple[list[dict[str, Any]], int]:
     where = []
-    params: Dict[str, Any] = {}
+    params: dict[str, Any] = {}
 
     if q:
         where.append("(title ILIKE :q OR summary ILIKE :q OR content ILIKE :q)")
@@ -114,8 +136,8 @@ def list_articles(
 def get_article(
     item_id: int,
     *,
-    connection_provider: ConnectionProvider | None = None,
-) -> Optional[Dict[str, Any]]:
+    connection_provider: ConnectionProvider,
+) -> dict[str, Any] | None:
     sql = text(
         "SELECT id, source, title, url, published_at, author, summary, content, keywords, created_at, updated_at "
         "FROM news_articles WHERE id=:id"
@@ -130,7 +152,7 @@ def get_article(
 def delete_article(
     item_id: int,
     *,
-    connection_provider: ConnectionProvider | None = None,
+    connection_provider: ConnectionProvider,
 ) -> bool:
     with open_connection_scope(connection_provider) as conn:
         result = conn.execute(text("DELETE FROM news_articles WHERE id=:id"), {"id": item_id})
@@ -139,22 +161,22 @@ def delete_article(
 
 
 class NewsRepository(NewsRepositoryPort):
-    def __init__(self, *, connection_provider: ConnectionProvider | None = None) -> None:
+    def __init__(self, *, connection_provider: ConnectionProvider) -> None:
         self._connection_provider = connection_provider
 
-    def upsert_articles(self, articles: List[Dict[str, Any]]) -> Tuple[int, int]:
+    def upsert_articles(self, articles: list[dict[str, Any]]) -> tuple[int, int]:
         return upsert_articles(articles, connection_provider=self._connection_provider)
 
     def list_articles(
         self,
         *,
-        q: Optional[str],
-        source: Optional[str],
-        date_from: Optional[str],
-        date_to: Optional[str],
+        q: str | None,
+        source: str | None,
+        date_from: str | None,
+        date_to: str | None,
         page: int,
         size: int,
-    ) -> Tuple[List[Dict[str, Any]], int]:
+    ) -> tuple[list[dict[str, Any]], int]:
         return list_articles(
             q=q,
             source=source,
@@ -165,7 +187,7 @@ class NewsRepository(NewsRepositoryPort):
             connection_provider=self._connection_provider,
         )
 
-    def get_article(self, item_id: int) -> Optional[Dict[str, Any]]:
+    def get_article(self, item_id: int) -> dict[str, Any] | None:
         return get_article(item_id, connection_provider=self._connection_provider)
 
     def delete_article(self, item_id: int) -> bool:

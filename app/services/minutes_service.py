@@ -5,7 +5,7 @@ from typing import Any
 from app.ports.repositories import MinutesRepositoryPort
 from app.ports.services import MinutesServicePort
 from app.repositories.minutes_repository import MinutesRepository
-from app.repositories.session_provider import ConnectionProvider
+from app.repositories.session_provider import ConnectionProvider, ensure_connection_provider
 from app.utils import bad_request, combine_meeting_no, parse_date
 
 
@@ -89,8 +89,8 @@ class MinutesService(MinutesServicePort):
 
 def build_minutes_service(
     *,
+    connection_provider: ConnectionProvider,
     repository: MinutesRepositoryPort | None = None,
-    connection_provider: ConnectionProvider | None = None,
 ) -> MinutesServicePort:
     selected_repository = repository or MinutesRepository(connection_provider=connection_provider)
     return MinutesService(repository=selected_repository)
@@ -106,7 +106,7 @@ def upsert_minutes(
     service: MinutesServicePort | None = None,
     connection_provider: ConnectionProvider | None = None,
 ) -> tuple[int, int]:
-    active_service = service or build_minutes_service(connection_provider=connection_provider)
+    active_service = service or build_minutes_service(connection_provider=ensure_connection_provider(connection_provider))
     return active_service.upsert_minutes(items)
 
 
@@ -124,7 +124,7 @@ def list_minutes(
     service: MinutesServicePort | None = None,
     connection_provider: ConnectionProvider | None = None,
 ) -> tuple[list[dict[str, Any]], int]:
-    active_service = service or build_minutes_service(connection_provider=connection_provider)
+    active_service = service or build_minutes_service(connection_provider=ensure_connection_provider(connection_provider))
     return active_service.list_minutes(
         q=q,
         council=council,
@@ -144,7 +144,7 @@ def get_minutes(
     service: MinutesServicePort | None = None,
     connection_provider: ConnectionProvider | None = None,
 ) -> dict[str, Any] | None:
-    active_service = service or build_minutes_service(connection_provider=connection_provider)
+    active_service = service or build_minutes_service(connection_provider=ensure_connection_provider(connection_provider))
     return active_service.get_minutes(item_id)
 
 
@@ -154,5 +154,5 @@ def delete_minutes(
     service: MinutesServicePort | None = None,
     connection_provider: ConnectionProvider | None = None,
 ) -> bool:
-    active_service = service or build_minutes_service(connection_provider=connection_provider)
+    active_service = service or build_minutes_service(connection_provider=ensure_connection_provider(connection_provider))
     return active_service.delete_minutes(item_id)

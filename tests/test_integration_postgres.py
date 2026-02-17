@@ -13,8 +13,6 @@ from sqlalchemy import text
 
 from app import create_app
 from app.config import Config
-from app.database import init_db
-import app.database as database
 
 pytestmark = pytest.mark.integration
 
@@ -60,11 +58,10 @@ def integration_client():
 
 
 @pytest.fixture(autouse=True)
-def clean_tables():
+def clean_tables(integration_client):
     _skip_if_not_enabled()
-    if database.engine is None:
-        init_db(Config().DATABASE_URL)
-    with database.engine.begin() as conn:
+    app = integration_client.app
+    with app.state.connection_provider() as conn:
         conn.execute(
             text(
                 """

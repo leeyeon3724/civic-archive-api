@@ -1,7 +1,6 @@
 import logging
 
 import pytest
-from conftest import StubResult
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.testclient import TestClient
 
@@ -63,17 +62,13 @@ def test_middleware_module_enforces_request_size_guard():
         assert payload["details"]["max_request_body_bytes"] == 64
 
 
-def test_system_routes_module_readiness_and_echo(db_module, monkeypatch, make_engine):
-    def db_ok_handler(_statement, _params):
-        return StubResult()
-
-    monkeypatch.setattr(db_module, "engine", make_engine(db_ok_handler))
-
+def test_system_routes_module_readiness_and_echo():
     api = FastAPI()
     register_system_routes(
         api,
         config=Config(),
         protected_dependencies=[],
+        db_health_check=lambda: (True, None),
         rate_limit_health_check=lambda: (False, "redis down"),
     )
 

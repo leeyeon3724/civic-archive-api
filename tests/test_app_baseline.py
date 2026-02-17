@@ -98,35 +98,36 @@ def test_normalize_segment_validates_importance(segments_module):
         segments_module.normalize_segment({"council": "A", "importance": 4})
 
 
-def test_upsert_articles_counts_insert_and_update(db_module, news_module, monkeypatch, make_engine):
-    rowcounts = iter([1, 2, 1])
-
+def test_upsert_articles_counts_insert_and_update(news_module, make_connection_provider):
     def handler(statement, _params):
         sql = str(statement).lower()
         if "insert into news_articles" in sql:
-            return StubResult(rowcount=next(rowcounts))
+            return StubResult(rows=[{"inserted": 2, "updated": 1}])
         return StubResult()
 
-    monkeypatch.setattr(db_module, "engine", make_engine(handler))
+    connection_provider, _ = make_connection_provider(handler)
 
     inserted, updated = news_module.upsert_articles(
         [
             {"title": "n1", "url": "u1"},
             {"title": "n2", "url": "u2"},
             {"title": "n3", "url": "u3"},
-        ]
+        ],
+        connection_provider=connection_provider,
     )
     assert inserted == 2
     assert updated == 1
 
 
-def test_insert_segments_returns_inserted_count(db_module, segments_module, monkeypatch, make_engine):
+def test_insert_segments_returns_inserted_count(segments_module, make_connection_provider):
     def handler(_statement, _params):
-        return StubResult(rowcount=1)
+        return StubResult(rows=[{"inserted": 2}])
 
-    monkeypatch.setattr(db_module, "engine", make_engine(handler))
-
-    inserted = segments_module.insert_segments([{"council": "A"}, {"council": "B"}])
+    connection_provider, _ = make_connection_provider(handler)
+    inserted = segments_module.insert_segments(
+        [{"council": "A"}, {"council": "B"}],
+        connection_provider=connection_provider,
+    )
     assert inserted == 2
 
 
@@ -200,7 +201,7 @@ def test_save_segments_requires_json(client):
     assert payload["code"] in {"BAD_REQUEST", "VALIDATION_ERROR"}
 
 
-def test_list_news_returns_paginated_payload(client, db_module, monkeypatch, make_engine):
+def test_list_news_returns_paginated_payload(client, use_stub_connection_provider):
     def handler(statement, _params):
         sql = str(statement).lower()
         if "select count(*) as total" in sql:
@@ -224,8 +225,7 @@ def test_list_news_returns_paginated_payload(client, db_module, monkeypatch, mak
             )
         return StubResult()
 
-    engine = make_engine(handler)
-    monkeypatch.setattr(db_module, "engine", engine)
+    engine = use_stub_connection_provider(handler)
 
     resp = client.get("/api/news?page=2&size=1&q=budget")
     data = resp.get_json()
@@ -242,21 +242,21 @@ def test_list_news_returns_paginated_payload(client, db_module, monkeypatch, mak
     assert first_select["params"]["q"] == "%budget%"
 
 
-def test_get_news_404_when_not_found(client, db_module, monkeypatch, make_engine):
+def test_get_news_404_when_not_found(client, use_stub_connection_provider):
     def handler(statement, _params):
         sql = str(statement).lower()
         if "from news_articles where id=:id" in sql:
             return StubResult(rows=[])
         return StubResult()
 
-    monkeypatch.setattr(db_module, "engine", make_engine(handler))
+    use_stub_connection_provider(handler)
 
     resp = client.get("/api/news/999")
     assert resp.status_code == 404
     _assert_not_found_error(resp.get_json())
 
 
-def test_delete_news_success_and_not_found(client, db_module, monkeypatch, make_engine):
+def test_delete_news_success_and_not_found(client, use_stub_connection_provider):
     def handler(statement, params):
         sql = str(statement).lower()
         if "delete from news_articles" in sql and params["id"] == 1:
@@ -265,7 +265,7 @@ def test_delete_news_success_and_not_found(client, db_module, monkeypatch, make_
             return StubResult(rowcount=0)
         return StubResult()
 
-    monkeypatch.setattr(db_module, "engine", make_engine(handler))
+    use_stub_connection_provider(handler)
 
     ok_resp = client.delete("/api/news/1")
     assert ok_resp.status_code == 200

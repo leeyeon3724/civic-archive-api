@@ -47,23 +47,22 @@ def test_list_segments_invalid_pagination_returns_400(client):
     assert bad_size.get_json()["code"] == "VALIDATION_ERROR"
 
 
-def test_upsert_minutes_counts_insert_and_update(db_module, minutes_module, monkeypatch, make_engine):
-    rowcounts = iter([1, 2, 2])
-
+def test_upsert_minutes_counts_insert_and_update(minutes_module, make_connection_provider):
     def handler(statement, _params):
         sql = str(statement).lower()
         if "insert into council_minutes" in sql:
-            return StubResult(rowcount=next(rowcounts))
+            return StubResult(rows=[{"inserted": 1, "updated": 2}])
         return StubResult()
 
-    monkeypatch.setattr(db_module, "engine", make_engine(handler))
+    connection_provider, _ = make_connection_provider(handler)
 
     inserted, updated = minutes_module.upsert_minutes(
         [
             {"council": "c1", "url": "u1"},
             {"council": "c2", "url": "u2"},
             {"council": "c3", "url": "u3"},
-        ]
+        ],
+        connection_provider=connection_provider,
     )
     assert inserted == 1
     assert updated == 2
@@ -97,7 +96,7 @@ def test_save_minutes_rejects_invalid_json_body(client):
     assert resp.get_json()["code"] in {"BAD_REQUEST", "VALIDATION_ERROR"}
 
 
-def test_list_minutes_returns_paginated_payload_and_filter_params(client, db_module, monkeypatch, make_engine):
+def test_list_minutes_returns_paginated_payload_and_filter_params(client, use_stub_connection_provider):
     def handler(statement, _params):
         sql = str(statement).lower()
         if "select count(*) as total" in sql:
@@ -123,8 +122,7 @@ def test_list_minutes_returns_paginated_payload_and_filter_params(client, db_mod
             )
         return StubResult()
 
-    engine = make_engine(handler)
-    monkeypatch.setattr(db_module, "engine", engine)
+    engine = use_stub_connection_provider(handler)
 
     resp = client.get(
         "/api/minutes?page=2&size=1&q=budget&council=A&committee=B&session=C&meeting_no=C%201th&from=2025-01-01&to=2025-01-31"
@@ -148,7 +146,7 @@ def test_list_minutes_returns_paginated_payload_and_filter_params(client, db_mod
     assert first_select["params"]["date_to"] == "2025-01-31"
 
 
-def test_get_minutes_success_and_404(client, db_module, monkeypatch, make_engine):
+def test_get_minutes_success_and_404(client, use_stub_connection_provider):
     def handler(statement, params):
         sql = str(statement).lower()
         if "from council_minutes" in sql and "where id=:id" in sql and params["id"] == 1:
@@ -175,7 +173,7 @@ def test_get_minutes_success_and_404(client, db_module, monkeypatch, make_engine
             return StubResult(rows=[])
         return StubResult()
 
-    monkeypatch.setattr(db_module, "engine", make_engine(handler))
+    use_stub_connection_provider(handler)
 
     ok_resp = client.get("/api/minutes/1")
     assert ok_resp.status_code == 200
@@ -186,7 +184,7 @@ def test_get_minutes_success_and_404(client, db_module, monkeypatch, make_engine
     _assert_not_found_error(miss_resp.get_json())
 
 
-def test_delete_minutes_success_and_not_found(client, db_module, monkeypatch, make_engine):
+def test_delete_minutes_success_and_not_found(client, use_stub_connection_provider):
     def handler(statement, params):
         sql = str(statement).lower()
         if "delete from council_minutes" in sql and params["id"] == 1:
@@ -195,7 +193,7 @@ def test_delete_minutes_success_and_not_found(client, db_module, monkeypatch, ma
             return StubResult(rowcount=0)
         return StubResult()
 
-    monkeypatch.setattr(db_module, "engine", make_engine(handler))
+    use_stub_connection_provider(handler)
 
     ok_resp = client.delete("/api/minutes/1")
     assert ok_resp.status_code == 200
@@ -231,7 +229,7 @@ def test_save_segments_rejects_invalid_json_body(client):
     assert resp.get_json()["code"] in {"BAD_REQUEST", "VALIDATION_ERROR"}
 
 
-def test_list_segments_returns_paginated_payload_and_filter_params(client, db_module, monkeypatch, make_engine):
+def test_list_segments_returns_paginated_payload_and_filter_params(client, use_stub_connection_provider):
     def handler(statement, _params):
         sql = str(statement).lower()
         if "select count(*) as total" in sql:
@@ -261,8 +259,7 @@ def test_list_segments_returns_paginated_payload_and_filter_params(client, db_mo
             )
         return StubResult()
 
-    engine = make_engine(handler)
-    monkeypatch.setattr(db_module, "engine", engine)
+    engine = use_stub_connection_provider(handler)
 
     resp = client.get(
         "/api/segments?page=2&size=1&q=budget&council=A&committee=B&session=C&meeting_no=C%201th&importance=2&party=P&constituency=X&department=D&from=2025-01-01&to=2025-01-31"
@@ -293,7 +290,7 @@ def test_list_segments_returns_paginated_payload_and_filter_params(client, db_mo
     assert first_select["params"]["date_to"] == "2025-01-31"
 
 
-def test_get_segment_success_and_404(client, db_module, monkeypatch, make_engine):
+def test_get_segment_success_and_404(client, use_stub_connection_provider):
     def handler(statement, params):
         sql = str(statement).lower()
         if "from council_speech_segments" in sql and "where id=:id" in sql and params["id"] == 1:
@@ -326,7 +323,7 @@ def test_get_segment_success_and_404(client, db_module, monkeypatch, make_engine
             return StubResult(rows=[])
         return StubResult()
 
-    monkeypatch.setattr(db_module, "engine", make_engine(handler))
+    use_stub_connection_provider(handler)
 
     ok_resp = client.get("/api/segments/1")
     assert ok_resp.status_code == 200
@@ -337,7 +334,7 @@ def test_get_segment_success_and_404(client, db_module, monkeypatch, make_engine
     _assert_not_found_error(miss_resp.get_json())
 
 
-def test_delete_segment_success_and_not_found(client, db_module, monkeypatch, make_engine):
+def test_delete_segment_success_and_not_found(client, use_stub_connection_provider):
     def handler(statement, params):
         sql = str(statement).lower()
         if "delete from council_speech_segments" in sql and params["id"] == 1:
@@ -346,7 +343,7 @@ def test_delete_segment_success_and_not_found(client, db_module, monkeypatch, ma
             return StubResult(rowcount=0)
         return StubResult()
 
-    monkeypatch.setattr(db_module, "engine", make_engine(handler))
+    use_stub_connection_provider(handler)
 
     ok_resp = client.delete("/api/segments/1")
     assert ok_resp.status_code == 200

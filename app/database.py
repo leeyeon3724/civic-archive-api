@@ -1,7 +1,5 @@
-﻿from sqlalchemy import create_engine
+from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
-
-engine: Engine = None  # type: ignore[assignment]
 
 
 def init_db(
@@ -13,8 +11,7 @@ def init_db(
     pool_recycle_seconds: int = 3600,
     connect_timeout_seconds: int = 3,
     statement_timeout_ms: int = 5000,
-):
-    global engine
+) -> Engine:
     connect_args = {
         "connect_timeout": max(1, int(connect_timeout_seconds)),
         "options": (
@@ -22,7 +19,7 @@ def init_db(
             "-c application_name=civic_archive_api"
         ),
     }
-    engine = create_engine(
+    return create_engine(
         database_url,
         pool_pre_ping=True,
         pool_size=max(1, int(pool_size)),
@@ -32,5 +29,3 @@ def init_db(
         connect_args=connect_args,
         future=True,
     )
-    return engine
-
