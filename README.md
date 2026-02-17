@@ -131,6 +131,9 @@ python -m alembic downgrade -1
 # 린트 검사
 python -m ruff check app tests scripts
 
+# 타입 검사 (phase-2, blocking)
+python scripts/check_mypy.py
+
 # unit/contract 테스트 + 커버리지 하한
 python -m pytest -q -m "not e2e and not integration" --cov=app --cov-report=term --cov-fail-under=85
 
