@@ -1,7 +1,7 @@
-﻿from datetime import date
+from datetime import date
 from typing import Any
 
-from fastapi import APIRouter, Body, Query, Request
+from fastapi import APIRouter, Body, Depends, Query, Request
 
 from app.errors import http_error
 from app.routes.common import ERROR_RESPONSES, enforce_ingest_batch_limit
@@ -12,7 +12,8 @@ from app.schemas import (
     NewsUpsertPayload,
     UpsertResponse,
 )
-from app.services.news_service import delete_article, get_article, list_articles, normalize_article, upsert_articles
+from app.services.news_service import NewsService
+from app.services.providers import get_news_service
 
 router = APIRouter(tags=["news"])
 
@@ -48,12 +49,13 @@ def save_news(
                 },
             ],
         ],
-    )
+    ),
+    service: NewsService = Depends(get_news_service),
 ):
     payload_items = payload if isinstance(payload, list) else [payload]
     enforce_ingest_batch_limit(request, len(payload_items))
-    items: list[dict[str, Any]] = [normalize_article(item.model_dump()) for item in payload_items]
-    inserted, updated = upsert_articles(items)
+    items: list[dict[str, Any]] = [service.normalize_article(item.model_dump()) for item in payload_items]
+    inserted, updated = service.upsert_articles(items)
     return UpsertResponse(inserted=inserted, updated=updated)
 
 
@@ -70,8 +72,9 @@ def list_news(
     size: int = Query(default=20, ge=1, le=200),
     date_from: date | None = Query(default=None, alias="from"),
     date_to: date | None = Query(default=None, alias="to"),
+    service: NewsService = Depends(get_news_service),
 ):
-    rows, total = list_articles(
+    rows, total = service.list_articles(
         q=q,
         source=source,
         date_from=date_from.isoformat() if date_from else None,
@@ -89,8 +92,8 @@ def list_news(
     response_model=NewsItemDetail,
     responses=ERROR_RESPONSES,
 )
-def get_news(item_id: int):
-    row = get_article(item_id)
+def get_news(item_id: int, service: NewsService = Depends(get_news_service)):
+    row = service.get_article(item_id)
     if not row:
         raise http_error(404, "NOT_FOUND", "Not Found")
     return NewsItemDetail(**row)
@@ -102,8 +105,8 @@ def get_news(item_id: int):
     response_model=DeleteResponse,
     responses=ERROR_RESPONSES,
 )
-def delete_news(item_id: int):
-    deleted = delete_article(item_id)
+def delete_news(item_id: int, service: NewsService = Depends(get_news_service)):
+    deleted = service.delete_article(item_id)
     if not deleted:
         raise http_error(404, "NOT_FOUND", "Not Found")
     return DeleteResponse(status="deleted", id=item_id)

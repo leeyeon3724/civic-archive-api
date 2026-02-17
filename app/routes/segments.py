@@ -1,7 +1,7 @@
-﻿from datetime import date
+from datetime import date
 from typing import Any
 
-from fastapi import APIRouter, Body, Query, Request
+from fastapi import APIRouter, Body, Depends, Query, Request
 
 from app.errors import http_error
 from app.routes.common import ERROR_RESPONSES, enforce_ingest_batch_limit
@@ -12,13 +12,8 @@ from app.schemas import (
     SegmentsItemDetail,
     SegmentsListResponse,
 )
-from app.services.segments_service import (
-    delete_segment as delete_segment_item,
-    get_segment as get_segment_item,
-    insert_segments,
-    list_segments as list_segments_items,
-    normalize_segment,
-)
+from app.services.providers import get_segments_service
+from app.services.segments_service import SegmentsService
 
 router = APIRouter(tags=["segments"])
 
@@ -45,12 +40,13 @@ def save_segments(
                 "importance": 2,
             }
         ],
-    )
+    ),
+    service: SegmentsService = Depends(get_segments_service),
 ):
     payload_items = payload if isinstance(payload, list) else [payload]
     enforce_ingest_batch_limit(request, len(payload_items))
-    items: list[dict[str, Any]] = [normalize_segment(item.model_dump()) for item in payload_items]
-    inserted = insert_segments(items)
+    items: list[dict[str, Any]] = [service.normalize_segment(item.model_dump()) for item in payload_items]
+    inserted = service.insert_segments(items)
     return InsertResponse(inserted=inserted)
 
 
@@ -74,8 +70,9 @@ def list_segments(
     size: int = Query(default=20, ge=1, le=200),
     date_from: date | None = Query(default=None, alias="from"),
     date_to: date | None = Query(default=None, alias="to"),
+    service: SegmentsService = Depends(get_segments_service),
 ):
-    rows, total = list_segments_items(
+    rows, total = service.list_segments(
         q=q,
         council=council,
         committee=committee,
@@ -100,8 +97,8 @@ def list_segments(
     response_model=SegmentsItemDetail,
     responses=ERROR_RESPONSES,
 )
-def get_segment(item_id: int):
-    row = get_segment_item(item_id)
+def get_segment(item_id: int, service: SegmentsService = Depends(get_segments_service)):
+    row = service.get_segment(item_id)
     if not row:
         raise http_error(404, "NOT_FOUND", "Not Found")
     return SegmentsItemDetail(**row)
@@ -113,8 +110,8 @@ def get_segment(item_id: int):
     response_model=DeleteResponse,
     responses=ERROR_RESPONSES,
 )
-def delete_segment(item_id: int):
-    deleted = delete_segment_item(item_id)
+def delete_segment(item_id: int, service: SegmentsService = Depends(get_segments_service)):
+    deleted = service.delete_segment(item_id)
     if not deleted:
         raise http_error(404, "NOT_FOUND", "Not Found")
     return DeleteResponse(status="deleted", id=item_id)

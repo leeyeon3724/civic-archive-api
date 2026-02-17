@@ -168,3 +168,43 @@ def delete_minutes(
         result = conn.execute(text("DELETE FROM council_minutes WHERE id=:id"), {"id": item_id})
 
     return result.rowcount > 0
+
+
+class MinutesRepository:
+    def __init__(self, *, connection_provider: ConnectionProvider | None = None) -> None:
+        self._connection_provider = connection_provider
+
+    def upsert_minutes(self, items: List[Dict[str, Any]]) -> Tuple[int, int]:
+        return upsert_minutes(items, connection_provider=self._connection_provider)
+
+    def list_minutes(
+        self,
+        *,
+        q: Optional[str],
+        council: Optional[str],
+        committee: Optional[str],
+        session: Optional[str],
+        meeting_no: Optional[str],
+        date_from: Optional[str],
+        date_to: Optional[str],
+        page: int,
+        size: int,
+    ) -> Tuple[List[Dict[str, Any]], int]:
+        return list_minutes(
+            q=q,
+            council=council,
+            committee=committee,
+            session=session,
+            meeting_no=meeting_no,
+            date_from=date_from,
+            date_to=date_to,
+            page=page,
+            size=size,
+            connection_provider=self._connection_provider,
+        )
+
+    def get_minutes(self, item_id: int) -> Optional[Dict[str, Any]]:
+        return get_minutes(item_id, connection_provider=self._connection_provider)
+
+    def delete_minutes(self, item_id: int) -> bool:
+        return delete_minutes(item_id, connection_provider=self._connection_provider)

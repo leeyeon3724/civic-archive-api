@@ -1,18 +1,13 @@
-﻿from datetime import date
+from datetime import date
 from typing import Any
 
-from fastapi import APIRouter, Body, Query, Request
+from fastapi import APIRouter, Body, Depends, Query, Request
 
 from app.errors import http_error
 from app.routes.common import ERROR_RESPONSES, enforce_ingest_batch_limit
 from app.schemas import DeleteResponse, MinutesItemDetail, MinutesListResponse, MinutesUpsertPayload, UpsertResponse
-from app.services.minutes_service import (
-    delete_minutes as delete_minutes_item,
-    get_minutes as get_minutes_item,
-    list_minutes as list_minutes_items,
-    normalize_minutes,
-    upsert_minutes,
-)
+from app.services.minutes_service import MinutesService
+from app.services.providers import get_minutes_service
 
 router = APIRouter(tags=["minutes"])
 
@@ -38,12 +33,13 @@ def save_minutes(
                 "meeting_date": "2026-02-17",
             }
         ],
-    )
+    ),
+    service: MinutesService = Depends(get_minutes_service),
 ):
     payload_items = payload if isinstance(payload, list) else [payload]
     enforce_ingest_batch_limit(request, len(payload_items))
-    items: list[dict[str, Any]] = [normalize_minutes(item.model_dump()) for item in payload_items]
-    inserted, updated = upsert_minutes(items)
+    items: list[dict[str, Any]] = [service.normalize_minutes(item.model_dump()) for item in payload_items]
+    inserted, updated = service.upsert_minutes(items)
     return UpsertResponse(inserted=inserted, updated=updated)
 
 
@@ -63,8 +59,9 @@ def list_minutes(
     size: int = Query(default=20, ge=1, le=200),
     date_from: date | None = Query(default=None, alias="from"),
     date_to: date | None = Query(default=None, alias="to"),
+    service: MinutesService = Depends(get_minutes_service),
 ):
-    rows, total = list_minutes_items(
+    rows, total = service.list_minutes(
         q=q,
         council=council,
         committee=committee,
@@ -85,8 +82,8 @@ def list_minutes(
     response_model=MinutesItemDetail,
     responses=ERROR_RESPONSES,
 )
-def get_minutes(item_id: int):
-    row = get_minutes_item(item_id)
+def get_minutes(item_id: int, service: MinutesService = Depends(get_minutes_service)):
+    row = service.get_minutes(item_id)
     if not row:
         raise http_error(404, "NOT_FOUND", "Not Found")
     return MinutesItemDetail(**row)
@@ -98,8 +95,8 @@ def get_minutes(item_id: int):
     response_model=DeleteResponse,
     responses=ERROR_RESPONSES,
 )
-def delete_minutes(item_id: int):
-    deleted = delete_minutes_item(item_id)
+def delete_minutes(item_id: int, service: MinutesService = Depends(get_minutes_service)):
+    deleted = service.delete_minutes(item_id)
     if not deleted:
         raise http_error(404, "NOT_FOUND", "Not Found")
     return DeleteResponse(status="deleted", id=item_id)

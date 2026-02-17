@@ -13,6 +13,7 @@ from app.config import Config
 from app.database import init_db
 from app.logging_config import configure_logging
 from app.observability import register_observability
+from app.repositories.session_provider import get_connection_provider
 from app.security import (
     build_api_key_dependency,
     build_jwt_dependency,
@@ -44,6 +45,7 @@ def create_app(config=None):
         openapi_tags=OPENAPI_TAGS,
     )
     api.state.config = config
+    api.state.connection_provider = lambda: get_connection_provider()()
 
     validate_startup_config(config)
     register_core_middleware(api, config)

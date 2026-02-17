@@ -135,3 +135,37 @@ def delete_article(
         result = conn.execute(text("DELETE FROM news_articles WHERE id=:id"), {"id": item_id})
 
     return result.rowcount > 0
+
+
+class NewsRepository:
+    def __init__(self, *, connection_provider: ConnectionProvider | None = None) -> None:
+        self._connection_provider = connection_provider
+
+    def upsert_articles(self, articles: List[Dict[str, Any]]) -> Tuple[int, int]:
+        return upsert_articles(articles, connection_provider=self._connection_provider)
+
+    def list_articles(
+        self,
+        *,
+        q: Optional[str],
+        source: Optional[str],
+        date_from: Optional[str],
+        date_to: Optional[str],
+        page: int,
+        size: int,
+    ) -> Tuple[List[Dict[str, Any]], int]:
+        return list_articles(
+            q=q,
+            source=source,
+            date_from=date_from,
+            date_to=date_to,
+            page=page,
+            size=size,
+            connection_provider=self._connection_provider,
+        )
+
+    def get_article(self, item_id: int) -> Optional[Dict[str, Any]]:
+        return get_article(item_id, connection_provider=self._connection_provider)
+
+    def delete_article(self, item_id: int) -> bool:
+        return delete_article(item_id, connection_provider=self._connection_provider)

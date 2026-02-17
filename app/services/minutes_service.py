@@ -1,17 +1,39 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Protocol
 
-from app.repositories.minutes_repository import (
-    delete_minutes as repository_delete_minutes,
-    get_minutes as repository_get_minutes,
-    list_minutes as repository_list_minutes,
-    upsert_minutes as repository_upsert_minutes,
-)
+from app.repositories.minutes_repository import MinutesRepository
+from app.repositories.session_provider import ConnectionProvider
 from app.utils import bad_request, combine_meeting_no, parse_date
 
 
-def normalize_minutes(item: dict[str, Any]) -> dict[str, Any]:
+class MinutesRepositoryPort(Protocol):
+    def upsert_minutes(self, items: list[dict[str, Any]]) -> tuple[int, int]:
+        ...
+
+    def list_minutes(
+        self,
+        *,
+        q: str | None,
+        council: str | None,
+        committee: str | None,
+        session: str | None,
+        meeting_no: str | None,
+        date_from: str | None,
+        date_to: str | None,
+        page: int,
+        size: int,
+    ) -> tuple[list[dict[str, Any]], int]:
+        ...
+
+    def get_minutes(self, item_id: int) -> dict[str, Any] | None:
+        ...
+
+    def delete_minutes(self, item_id: int) -> bool:
+        ...
+
+
+def _normalize_minutes(item: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(item, dict):
         raise bad_request("Each item must be a JSON object.")
 
@@ -47,8 +69,69 @@ def normalize_minutes(item: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def upsert_minutes(items: list[dict[str, Any]]) -> tuple[int, int]:
-    return repository_upsert_minutes(items)
+class MinutesService:
+    def __init__(self, *, repository: MinutesRepositoryPort) -> None:
+        self._repository = repository
+
+    def normalize_minutes(self, item: dict[str, Any]) -> dict[str, Any]:
+        return _normalize_minutes(item)
+
+    def upsert_minutes(self, items: list[dict[str, Any]]) -> tuple[int, int]:
+        return self._repository.upsert_minutes(items)
+
+    def list_minutes(
+        self,
+        *,
+        q: str | None,
+        council: str | None,
+        committee: str | None,
+        session: str | None,
+        meeting_no: str | None,
+        date_from: str | None,
+        date_to: str | None,
+        page: int,
+        size: int,
+    ) -> tuple[list[dict[str, Any]], int]:
+        return self._repository.list_minutes(
+            q=q,
+            council=council,
+            committee=committee,
+            session=session,
+            meeting_no=meeting_no,
+            date_from=date_from,
+            date_to=date_to,
+            page=page,
+            size=size,
+        )
+
+    def get_minutes(self, item_id: int) -> dict[str, Any] | None:
+        return self._repository.get_minutes(item_id)
+
+    def delete_minutes(self, item_id: int) -> bool:
+        return self._repository.delete_minutes(item_id)
+
+
+def build_minutes_service(
+    *,
+    repository: MinutesRepositoryPort | None = None,
+    connection_provider: ConnectionProvider | None = None,
+) -> MinutesService:
+    selected_repository = repository or MinutesRepository(connection_provider=connection_provider)
+    return MinutesService(repository=selected_repository)
+
+
+def normalize_minutes(item: dict[str, Any]) -> dict[str, Any]:
+    return _normalize_minutes(item)
+
+
+def upsert_minutes(
+    items: list[dict[str, Any]],
+    *,
+    service: MinutesService | None = None,
+    connection_provider: ConnectionProvider | None = None,
+) -> tuple[int, int]:
+    active_service = service or build_minutes_service(connection_provider=connection_provider)
+    return active_service.upsert_minutes(items)
 
 
 def list_minutes(
@@ -62,8 +145,11 @@ def list_minutes(
     date_to: str | None,
     page: int,
     size: int,
+    service: MinutesService | None = None,
+    connection_provider: ConnectionProvider | None = None,
 ) -> tuple[list[dict[str, Any]], int]:
-    return repository_list_minutes(
+    active_service = service or build_minutes_service(connection_provider=connection_provider)
+    return active_service.list_minutes(
         q=q,
         council=council,
         committee=committee,
@@ -76,9 +162,21 @@ def list_minutes(
     )
 
 
-def get_minutes(item_id: int) -> dict[str, Any] | None:
-    return repository_get_minutes(item_id)
+def get_minutes(
+    item_id: int,
+    *,
+    service: MinutesService | None = None,
+    connection_provider: ConnectionProvider | None = None,
+) -> dict[str, Any] | None:
+    active_service = service or build_minutes_service(connection_provider=connection_provider)
+    return active_service.get_minutes(item_id)
 
 
-def delete_minutes(item_id: int) -> bool:
-    return repository_delete_minutes(item_id)
+def delete_minutes(
+    item_id: int,
+    *,
+    service: MinutesService | None = None,
+    connection_provider: ConnectionProvider | None = None,
+) -> bool:
+    active_service = service or build_minutes_service(connection_provider=connection_provider)
+    return active_service.delete_minutes(item_id)

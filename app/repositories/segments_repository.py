@@ -193,3 +193,51 @@ def delete_segment(
         result = conn.execute(text("DELETE FROM council_speech_segments WHERE id=:id"), {"id": item_id})
 
     return result.rowcount > 0
+
+
+class SegmentsRepository:
+    def __init__(self, *, connection_provider: ConnectionProvider | None = None) -> None:
+        self._connection_provider = connection_provider
+
+    def insert_segments(self, items: List[Dict[str, Any]]) -> int:
+        return insert_segments(items, connection_provider=self._connection_provider)
+
+    def list_segments(
+        self,
+        *,
+        q: Optional[str],
+        council: Optional[str],
+        committee: Optional[str],
+        session: Optional[str],
+        meeting_no: Optional[str],
+        importance: Optional[int],
+        party: Optional[str],
+        constituency: Optional[str],
+        department: Optional[str],
+        date_from: Optional[str],
+        date_to: Optional[str],
+        page: int,
+        size: int,
+    ) -> Tuple[List[Dict[str, Any]], int]:
+        return list_segments(
+            q=q,
+            council=council,
+            committee=committee,
+            session=session,
+            meeting_no=meeting_no,
+            importance=importance,
+            party=party,
+            constituency=constituency,
+            department=department,
+            date_from=date_from,
+            date_to=date_to,
+            page=page,
+            size=size,
+            connection_provider=self._connection_provider,
+        )
+
+    def get_segment(self, item_id: int) -> Optional[Dict[str, Any]]:
+        return get_segment(item_id, connection_provider=self._connection_provider)
+
+    def delete_segment(self, item_id: int) -> bool:
+        return delete_segment(item_id, connection_provider=self._connection_provider)
