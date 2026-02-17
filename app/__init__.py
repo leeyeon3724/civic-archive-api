@@ -46,6 +46,7 @@ def create_app(config=None):
         description="Local council archive API with FastAPI + PostgreSQL",
         openapi_tags=OPENAPI_TAGS,
     )
+    api.state.config = config
 
     if config.BOOTSTRAP_TABLES_ON_STARTUP:
         raise RuntimeError("BOOTSTRAP_TABLES_ON_STARTUP is disabled. Run 'alembic upgrade head' before startup.")
@@ -73,6 +74,10 @@ def create_app(config=None):
         raise RuntimeError("DB_CONNECT_TIMEOUT_SECONDS must be greater than 0.")
     if config.DB_STATEMENT_TIMEOUT_MS <= 0:
         raise RuntimeError("DB_STATEMENT_TIMEOUT_MS must be greater than 0.")
+    if config.INGEST_MAX_BATCH_ITEMS <= 0:
+        raise RuntimeError("INGEST_MAX_BATCH_ITEMS must be greater than 0.")
+    if config.MAX_REQUEST_BODY_BYTES <= 0:
+        raise RuntimeError("MAX_REQUEST_BODY_BYTES must be greater than 0.")
     if config.strict_security_mode:
         if not (config.REQUIRE_API_KEY or config.REQUIRE_JWT):
             raise RuntimeError("Strict security mode requires REQUIRE_API_KEY=1 or REQUIRE_JWT=1.")
@@ -90,6 +95,33 @@ def create_app(config=None):
         allow_headers=config.cors_allow_headers_list,
     )
     api.add_middleware(TrustedHostMiddleware, allowed_hosts=config.allowed_hosts_list)
+
+    @api.middleware("http")
+    async def request_size_guard(request: Request, call_next):
+        if request.url.path.startswith("/api/") and request.method in {"POST", "PUT", "PATCH"}:
+            content_length_raw = (request.headers.get("content-length") or "").strip()
+            if content_length_raw:
+                try:
+                    content_length = int(content_length_raw)
+                except ValueError:
+                    return error_response(
+                        request,
+                        status_code=400,
+                        code="BAD_REQUEST",
+                        message="Invalid Content-Length header",
+                    )
+                if content_length > int(config.MAX_REQUEST_BODY_BYTES):
+                    return error_response(
+                        request,
+                        status_code=413,
+                        code="PAYLOAD_TOO_LARGE",
+                        message="Payload Too Large",
+                        details={
+                            "max_request_body_bytes": int(config.MAX_REQUEST_BODY_BYTES),
+                            "content_length": content_length,
+                        },
+                    )
+        return await call_next(request)
 
     init_db(
         config.DATABASE_URL,

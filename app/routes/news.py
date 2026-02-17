@@ -1,10 +1,10 @@
 ﻿from datetime import date
 from typing import Any
 
-from fastapi import APIRouter, Body, Query
+from fastapi import APIRouter, Body, Query, Request
 
 from app.errors import http_error
-from app.routes.common import ERROR_RESPONSES
+from app.routes.common import ERROR_RESPONSES, enforce_ingest_batch_limit
 from app.schemas import (
     DeleteResponse,
     NewsItemDetail,
@@ -25,6 +25,7 @@ router = APIRouter(tags=["news"])
     responses=ERROR_RESPONSES,
 )
 def save_news(
+    request: Request,
     payload: NewsUpsertPayload = Body(
         ...,
         examples=[
@@ -50,6 +51,7 @@ def save_news(
     )
 ):
     payload_items = payload if isinstance(payload, list) else [payload]
+    enforce_ingest_batch_limit(request, len(payload_items))
     items: list[dict[str, Any]] = [normalize_article(item.model_dump()) for item in payload_items]
     inserted, updated = upsert_articles(items)
     return UpsertResponse(inserted=inserted, updated=updated)

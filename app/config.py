@@ -24,6 +24,8 @@ class Config(BaseSettings):
     DB_POOL_RECYCLE_SECONDS: int = 3600
     DB_CONNECT_TIMEOUT_SECONDS: int = 3
     DB_STATEMENT_TIMEOUT_MS: int = 5000
+    INGEST_MAX_BATCH_ITEMS: int = 200
+    MAX_REQUEST_BODY_BYTES: int = 1_048_576
 
     DEBUG: bool = False
     APP_ENV: str = "development"

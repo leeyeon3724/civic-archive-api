@@ -724,8 +724,49 @@ def test_create_app_applies_database_runtime_tuning():
         ({"DB_POOL_RECYCLE_SECONDS": 0}, "DB_POOL_RECYCLE_SECONDS must be greater than 0."),
         ({"DB_CONNECT_TIMEOUT_SECONDS": 0}, "DB_CONNECT_TIMEOUT_SECONDS must be greater than 0."),
         ({"DB_STATEMENT_TIMEOUT_MS": 0}, "DB_STATEMENT_TIMEOUT_MS must be greater than 0."),
+        ({"INGEST_MAX_BATCH_ITEMS": 0}, "INGEST_MAX_BATCH_ITEMS must be greater than 0."),
+        ({"MAX_REQUEST_BODY_BYTES": 0}, "MAX_REQUEST_BODY_BYTES must be greater than 0."),
     ],
 )
 def test_create_app_rejects_invalid_database_runtime_tuning(config_overrides, expected_message):
     with pytest.raises(RuntimeError, match=expected_message):
         create_app(Config(**config_overrides))
+
+
+def test_ingest_batch_limit_rejects_oversized_payload(make_engine):
+    with patch("app.database.create_engine", return_value=make_engine(lambda *_: StubResult())):
+        app = create_app(Config(INGEST_MAX_BATCH_ITEMS=1))
+
+    with TestClient(app) as tc:
+        response = tc.post(
+            "/api/news",
+            json=[
+                {"title": "n1", "url": "https://example.com/news/1"},
+                {"title": "n2", "url": "https://example.com/news/2"},
+            ],
+        )
+        assert response.status_code == 413
+        payload = response.json()
+        assert payload["code"] == "PAYLOAD_TOO_LARGE"
+        assert payload["message"] == "Payload Too Large"
+        assert payload["details"]["max_batch_items"] == 1
+        assert payload["details"]["received_batch_items"] == 2
+
+
+def test_request_size_guard_rejects_large_content_length(make_engine):
+    with patch("app.database.create_engine", return_value=make_engine(lambda *_: StubResult())):
+        app = create_app(Config(MAX_REQUEST_BODY_BYTES=64))
+
+    with TestClient(app) as tc:
+        body = '{"payload":"' + ("x" * 200) + '"}'
+        response = tc.post(
+            "/api/echo",
+            content=body,
+            headers={"Content-Type": "application/json"},
+        )
+        assert response.status_code == 413
+        payload = response.json()
+        assert payload["code"] == "PAYLOAD_TOO_LARGE"
+        assert payload["message"] == "Payload Too Large"
+        assert payload["details"]["max_request_body_bytes"] == 64
+        assert payload["details"]["content_length"] > 64

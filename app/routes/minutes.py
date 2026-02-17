@@ -1,10 +1,10 @@
 ﻿from datetime import date
 from typing import Any
 
-from fastapi import APIRouter, Body, Query
+from fastapi import APIRouter, Body, Query, Request
 
 from app.errors import http_error
-from app.routes.common import ERROR_RESPONSES
+from app.routes.common import ERROR_RESPONSES, enforce_ingest_batch_limit
 from app.schemas import DeleteResponse, MinutesItemDetail, MinutesListResponse, MinutesUpsertPayload, UpsertResponse
 from app.services.minutes_service import (
     delete_minutes as delete_minutes_item,
@@ -25,6 +25,7 @@ router = APIRouter(tags=["minutes"])
     responses=ERROR_RESPONSES,
 )
 def save_minutes(
+    request: Request,
     payload: MinutesUpsertPayload = Body(
         ...,
         examples=[
@@ -40,6 +41,7 @@ def save_minutes(
     )
 ):
     payload_items = payload if isinstance(payload, list) else [payload]
+    enforce_ingest_batch_limit(request, len(payload_items))
     items: list[dict[str, Any]] = [normalize_minutes(item.model_dump()) for item in payload_items]
     inserted, updated = upsert_minutes(items)
     return UpsertResponse(inserted=inserted, updated=updated)
