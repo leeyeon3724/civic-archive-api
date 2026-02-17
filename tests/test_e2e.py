@@ -38,6 +38,16 @@ class APIClient:
         return self.session.delete(f"{self.base}{path}", headers=headers, timeout=self.timeout)
 
 
+@pytest.fixture(scope="module", autouse=True)
+def ensure_e2e_target_reachable(request) -> None:
+    base_url = request.config.getoption("--base-url").rstrip("/")
+    probe_url = f"{base_url}/health"
+    try:
+        requests.get(probe_url, timeout=3)
+    except requests.RequestException as exc:
+        pytest.skip(f"E2E target is unreachable: {probe_url} ({exc.__class__.__name__})")
+
+
 @pytest.fixture(scope="module")
 def api(request) -> APIClient:
     return APIClient(request.config.getoption("--base-url"))
