@@ -1,0 +1,47 @@
+name: Commit Message Policy
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Resolve commit range
+        id: range
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            RANGE="${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}"
+            MAX_COUNT=0
+          else
+            BEFORE="${{ github.event.before }}"
+            AFTER="${{ github.sha }}"
+            if [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
+              RANGE="$AFTER"
+              MAX_COUNT=1
+            else
+              RANGE="$BEFORE..$AFTER"
+              MAX_COUNT=0
+            fi
+          fi
+          echo "range=$RANGE" >> "$GITHUB_OUTPUT"
+          echo "max_count=$MAX_COUNT" >> "$GITHUB_OUTPUT"
+
+      - name: Enforce commit message policy
+        run: |
+          python scripts/check_commit_messages.py \
+            --rev-range "${{ steps.range.outputs.range }}" \
+            --max-count "${{ steps.range.outputs.max_count }}" \
+            --mode fail
