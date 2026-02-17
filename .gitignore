@@ -1,6 +1,9 @@
 # Created by https://www.toptal.com/developers/gitignore/api/flask,python,pycharm,jetbrains
 # Edit at https://www.toptal.com/developers/gitignore?templates=flask,python,pycharm,jetbrains
 
+# Ignore entire JetBrains project metadata folder
+.idea/
+
 ### Flask ###
 instance/*
 !instance/.gitignore
