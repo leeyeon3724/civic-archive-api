@@ -1,6 +1,11 @@
 from __future__ import annotations
 
+import base64
+import hashlib
+import hmac
+import json
 import os
+import time
 
 import pytest
 from fastapi.testclient import TestClient
@@ -17,6 +22,33 @@ pytestmark = pytest.mark.integration
 def _skip_if_not_enabled():
     if os.getenv("RUN_INTEGRATION") != "1":
         pytest.skip("Integration tests require RUN_INTEGRATION=1 and a running PostgreSQL instance.")
+
+
+def _build_jwt(secret: str, claims: dict) -> str:
+    header = {"alg": "HS256", "typ": "JWT"}
+
+    def _encode(value: dict) -> str:
+        raw = json.dumps(value, separators=(",", ":"), sort_keys=True).encode("utf-8")
+        return base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")
+
+    header_b64 = _encode(header)
+    payload_b64 = _encode(claims)
+    signing_input = f"{header_b64}.{payload_b64}".encode("ascii")
+    signature = hmac.new(secret.encode("utf-8"), signing_input, hashlib.sha256).digest()
+    signature_b64 = base64.urlsafe_b64encode(signature).decode("ascii").rstrip("=")
+    return f"{header_b64}.{payload_b64}.{signature_b64}"
+
+
+def _metric_counter_value(metrics_text: str, *, method: str, path: str, status_code: str) -> float:
+    prefix = (
+        "civic_archive_http_requests_total{"
+        f'method="{method}",path="{path}",status_code="{status_code}"'
+        "} "
+    )
+    for line in metrics_text.splitlines():
+        if line.startswith(prefix):
+            return float(line[len(prefix) :])
+    return 0.0
 
 
 @pytest.fixture(scope="session")
@@ -136,3 +168,101 @@ def test_metrics_endpoint_available(integration_client):
     assert resp.status_code == 200
     assert "text/plain" in (resp.headers.get("content-type") or "")
     assert "civic_archive_http_requests_total" in resp.text
+
+
+def test_runtime_jwt_authorization_path():
+    _skip_if_not_enabled()
+    secret = "integration-jwt-secret"
+    now = int(time.time())
+    read_token = _build_jwt(
+        secret,
+        {
+            "sub": "integration-read",
+            "scope": "archive:read",
+            "exp": now + 300,
+        },
+    )
+    write_token = _build_jwt(
+        secret,
+        {
+            "sub": "integration-write",
+            "scope": "archive:write archive:read",
+            "exp": now + 300,
+        },
+    )
+    app = create_app(Config(REQUIRE_JWT=True, JWT_SECRET=secret))
+    with TestClient(app) as client:
+        unauthorized = client.post("/api/echo", json={"hello": "world"})
+        assert unauthorized.status_code == 401
+        assert unauthorized.json()["code"] == "UNAUTHORIZED"
+
+        forbidden = client.post(
+            "/api/echo",
+            json={"hello": "world"},
+            headers={"Authorization": f"Bearer {read_token}"},
+        )
+        assert forbidden.status_code == 403
+        assert forbidden.json()["code"] == "FORBIDDEN"
+
+        authorized = client.post(
+            "/api/echo",
+            json={"hello": "world"},
+            headers={"Authorization": f"Bearer {write_token}"},
+        )
+        assert authorized.status_code == 200
+        assert authorized.json() == {"you_sent": {"hello": "world"}}
+
+
+def test_payload_guard_returns_standard_413_shape():
+    _skip_if_not_enabled()
+    app = create_app(Config(MAX_REQUEST_BODY_BYTES=64))
+    with TestClient(app) as client:
+        body = '{"payload":"' + ("x" * 200) + '"}'
+        response = client.post(
+            "/api/echo",
+            content=body,
+            headers={"Content-Type": "application/json"},
+        )
+        assert response.status_code == 413
+        payload = response.json()
+        assert payload["code"] == "PAYLOAD_TOO_LARGE"
+        assert payload["message"] == "Payload Too Large"
+        assert payload["error"] == "Payload Too Large"
+        assert payload["details"]["max_request_body_bytes"] == 64
+        assert payload["details"]["content_length"] > 64
+        assert payload.get("request_id")
+        assert response.headers.get("X-Request-Id") == payload["request_id"]
+
+
+def test_metrics_label_for_guard_failure_uses_route_template():
+    _skip_if_not_enabled()
+    app = create_app(Config(MAX_REQUEST_BODY_BYTES=64))
+    with TestClient(app) as client:
+        before = client.get("/metrics")
+        assert before.status_code == 200
+        before_echo_413 = _metric_counter_value(
+            before.text, method="POST", path="/api/echo", status_code="413"
+        )
+        before_unmatched_413 = _metric_counter_value(
+            before.text, method="POST", path="/_unmatched", status_code="413"
+        )
+
+        oversized = client.post(
+            "/api/echo",
+            content='{"payload":"' + ("x" * 200) + '"}',
+            headers={"Content-Type": "application/json"},
+        )
+        assert oversized.status_code == 413
+        assert oversized.json()["code"] == "PAYLOAD_TOO_LARGE"
+
+        after = client.get("/metrics")
+        assert after.status_code == 200
+        after_echo_413 = _metric_counter_value(
+            after.text, method="POST", path="/api/echo", status_code="413"
+        )
+        after_unmatched_413 = _metric_counter_value(
+            after.text, method="POST", path="/_unmatched", status_code="413"
+        )
+
+        assert after_echo_413 == before_echo_413 + 1
+        assert after_unmatched_413 == before_unmatched_413
