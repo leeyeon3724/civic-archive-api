@@ -25,6 +25,9 @@
 - ingest/load 안전 가드 옵션 추가 (`INGEST_MAX_BATCH_ITEMS`, `MAX_REQUEST_BODY_BYTES`)
 - 커밋 메시지 정책 검사 스크립트/로컬 훅 설치 스크립트 추가 (`scripts/check_commit_messages.py`, `scripts/install_git_hooks.ps1`)
 - P6 리팩토링 백로그 추가 (`streaming guard`, `metrics label accuracy`, `integration/e2e reliability`)
+- 관측성 라벨 정확도 회귀 테스트 추가 (`tests/test_observability_labels.py`)
+- 통합 테스트 범위 확장 (`tests/test_integration_postgres.py`: JWT runtime 경로, payload guard `413`, metrics label 검증)
+- e2e 도달성 검사 기반 skip 가드 추가 (`tests/test_e2e.py`)
 
 ### 변경됨
 
@@ -43,6 +46,8 @@
 - CI에 커밋 메시지 정책 강제 단계 추가 (`.github/workflows/commit-message.yml`)
 - 요청 본문 상한 가드를 강화해 `Content-Length`와 실제 본문 길이를 함께 검증하도록 조정
 - 운영/성능/백로그 문서의 벤치마크 명령 및 상태 표기를 정합성 기준에 맞게 정리
+- 요청 본문 상한 가드를 스트리밍 누적 방식으로 조정해 미들웨어 full-body preload를 제거하고 초과 시 `413` 응답을 보장
+- payload guard 등 pre-route 실패 케이스에서도 metrics path 라벨이 라우트 템플릿(`/api/echo`)로 집계되도록 조정
 
 ### 수정됨
 
