@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import sys
 import time
 from uuid import uuid4
 
@@ -34,7 +35,7 @@ def _resolve_route_template_from_router(request: Request, api: FastAPI | None = 
     for route in api.router.routes:
         try:
             matched, _ = route.matches(scope)
-        except Exception:
+        except (AttributeError, KeyError, TypeError, ValueError):
             continue
         if matched != Match.FULL:
             continue
@@ -117,63 +118,66 @@ def register_observability(api: FastAPI) -> None:
         request.state.request_id = request_id
         started = time.perf_counter()
         client_ip = request.client.host if request.client else None
+        response: Response | None = None
 
         try:
             response = await call_next(request)
-        except Exception as exc:
+        finally:
             elapsed = time.perf_counter() - started
             path = _metric_path_label(request, api)
-            status_code = _status_code_from_exception(exc)
-
-            _observe_request_metrics(
-                method=request.method,
-                path=path,
-                status_code=status_code,
-                elapsed_seconds=elapsed,
-            )
-            log_payload = _build_request_log_payload(
-                request_id=request_id,
-                method=request.method,
-                path=path,
-                status_code=status_code,
-                elapsed_seconds=elapsed,
-                client_ip=client_ip,
-            )
-            if status_code >= 500:
-                logger.exception(
-                    "request_failed",
-                    extra=log_payload,
+            current_exc = sys.exc_info()[1]
+            if current_exc is not None:
+                status_code = 500
+                if isinstance(current_exc, Exception):
+                    status_code = _status_code_from_exception(current_exc)
+                _observe_request_metrics(
+                    method=request.method,
+                    path=path,
+                    status_code=status_code,
+                    elapsed_seconds=elapsed,
                 )
+                log_payload = _build_request_log_payload(
+                    request_id=request_id,
+                    method=request.method,
+                    path=path,
+                    status_code=status_code,
+                    elapsed_seconds=elapsed,
+                    client_ip=client_ip,
+                )
+                if status_code >= 500:
+                    logger.exception(
+                        "request_failed",
+                        extra=log_payload,
+                    )
+                else:
+                    logger.warning(
+                        "request_failed",
+                        extra=log_payload,
+                    )
             else:
-                logger.warning(
-                    "request_failed",
+                assert response is not None
+                status_code = int(response.status_code)
+                _observe_request_metrics(
+                    method=request.method,
+                    path=path,
+                    status_code=status_code,
+                    elapsed_seconds=elapsed,
+                )
+                response.headers["X-Request-Id"] = request_id
+                log_payload = _build_request_log_payload(
+                    request_id=request_id,
+                    method=request.method,
+                    path=path,
+                    status_code=status_code,
+                    elapsed_seconds=elapsed,
+                    client_ip=client_ip,
+                )
+                logger.info(
+                    "request_completed",
                     extra=log_payload,
                 )
-            raise
 
-        elapsed = time.perf_counter() - started
-        path = _metric_path_label(request, api)
-        status_code = int(response.status_code)
-        _observe_request_metrics(
-            method=request.method,
-            path=path,
-            status_code=status_code,
-            elapsed_seconds=elapsed,
-        )
-        response.headers["X-Request-Id"] = request_id
-
-        log_payload = _build_request_log_payload(
-            request_id=request_id,
-            method=request.method,
-            path=path,
-            status_code=status_code,
-            elapsed_seconds=elapsed,
-            client_ip=client_ip,
-        )
-        logger.info(
-            "request_completed",
-            extra=log_payload,
-        )
+        assert response is not None
         return response
 
     @api.get("/metrics", tags=["system"], include_in_schema=False)

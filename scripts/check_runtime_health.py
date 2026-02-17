@@ -21,7 +21,7 @@ def _http_get_json(url: str, timeout: float) -> tuple[int, dict | str]:
         body_raw = response.text
         try:
             body = json.loads(body_raw) if body_raw else {}
-        except Exception:
+        except json.JSONDecodeError:
             body = body_raw
         return status, body
     except requests.RequestException as exc:

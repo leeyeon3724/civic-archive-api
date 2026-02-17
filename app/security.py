@@ -25,7 +25,7 @@ try:
     import redis as redis_module
     from redis.exceptions import NoScriptError as RedisNoScriptError
     from redis.exceptions import RedisError as RedisBaseError
-except Exception:  # pragma: no cover - exercised only when redis is unavailable.
+except ImportError:  # pragma: no cover - exercised only when redis is unavailable.
     redis_module = None
 
     class _RedisBaseError(Exception):
