@@ -76,6 +76,40 @@ def _metric_status_label(status_code: int) -> str:
     return "000"
 
 
+def _status_code_from_exception(exc: Exception) -> int:
+    if isinstance(exc, RequestValidationError):
+        return 400
+    if isinstance(exc, StarletteHTTPException):
+        return int(exc.status_code)
+    return 500
+
+
+def _build_request_log_payload(
+    *,
+    request_id: str,
+    method: str,
+    path: str,
+    status_code: int,
+    elapsed_seconds: float,
+    client_ip: str | None,
+) -> dict[str, str | int | float | None]:
+    return {
+        "request_id": request_id,
+        "method": method,
+        "path": path,
+        "status_code": int(status_code),
+        "duration_ms": round(elapsed_seconds * 1000, 2),
+        "client_ip": client_ip,
+    }
+
+
+def _observe_request_metrics(*, method: str, path: str, status_code: int, elapsed_seconds: float) -> None:
+    method_label = _metric_method_label(method)
+    status_label = _metric_status_label(status_code)
+    REQUEST_COUNT.labels(method_label, path, status_label).inc()
+    REQUEST_LATENCY.labels(method_label, path).observe(elapsed_seconds)
+
+
 def register_observability(api: FastAPI) -> None:
     @api.middleware("http")
     async def request_observability(request: Request, call_next):
@@ -88,25 +122,23 @@ def register_observability(api: FastAPI) -> None:
             response = await call_next(request)
         except Exception as exc:
             elapsed = time.perf_counter() - started
-            method = _metric_method_label(request.method)
             path = _metric_path_label(request, api)
-            status_code = 500
-            if isinstance(exc, RequestValidationError):
-                status_code = 400
-            elif isinstance(exc, StarletteHTTPException):
-                status_code = int(exc.status_code)
-            status_label = _metric_status_label(status_code)
+            status_code = _status_code_from_exception(exc)
 
-            REQUEST_COUNT.labels(method, path, status_label).inc()
-            REQUEST_LATENCY.labels(method, path).observe(elapsed)
-            log_payload = {
-                "request_id": request_id,
-                "method": request.method,
-                "path": path,
-                "status_code": status_code,
-                "duration_ms": round(elapsed * 1000, 2),
-                "client_ip": client_ip,
-            }
+            _observe_request_metrics(
+                method=request.method,
+                path=path,
+                status_code=status_code,
+                elapsed_seconds=elapsed,
+            )
+            log_payload = _build_request_log_payload(
+                request_id=request_id,
+                method=request.method,
+                path=path,
+                status_code=status_code,
+                elapsed_seconds=elapsed,
+                client_ip=client_ip,
+            )
             if status_code >= 500:
                 logger.exception(
                     "request_failed",
@@ -120,24 +152,27 @@ def register_observability(api: FastAPI) -> None:
             raise
 
         elapsed = time.perf_counter() - started
-        method = _metric_method_label(request.method)
         path = _metric_path_label(request, api)
         status_code = int(response.status_code)
-        status_label = _metric_status_label(status_code)
-        REQUEST_COUNT.labels(method, path, status_label).inc()
-        REQUEST_LATENCY.labels(method, path).observe(elapsed)
+        _observe_request_metrics(
+            method=request.method,
+            path=path,
+            status_code=status_code,
+            elapsed_seconds=elapsed,
+        )
         response.headers["X-Request-Id"] = request_id
 
+        log_payload = _build_request_log_payload(
+            request_id=request_id,
+            method=request.method,
+            path=path,
+            status_code=status_code,
+            elapsed_seconds=elapsed,
+            client_ip=client_ip,
+        )
         logger.info(
             "request_completed",
-            extra={
-                "request_id": request_id,
-                "method": request.method,
-                "path": path,
-                "status_code": status_code,
-                "duration_ms": round(elapsed * 1000, 2),
-                "client_ip": client_ip,
-            },
+            extra=log_payload,
         )
         return response
 

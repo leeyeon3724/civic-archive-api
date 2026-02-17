@@ -97,6 +97,31 @@ def test_news_upsert_and_update(integration_client):
     assert listed.json()["items"][0]["title"] == "integration news updated"
 
 
+def test_news_batch_with_duplicate_url_is_stable(integration_client):
+    payload = [
+        {
+            "source": "integration-dup",
+            "title": "integration dup news v1",
+            "url": "https://example.com/news/int-dup-1",
+            "published_at": "2026-02-17T10:00:00Z",
+        },
+        {
+            "source": "integration-dup",
+            "title": "integration dup news v2",
+            "url": "https://example.com/news/int-dup-1",
+            "published_at": "2026-02-17T10:00:00Z",
+        },
+    ]
+    saved = integration_client.post("/api/news", json=payload)
+    assert saved.status_code == 201
+    assert saved.json() == {"inserted": 1, "updated": 0}
+
+    listed = integration_client.get("/api/news", params={"source": "integration-dup"})
+    assert listed.status_code == 200
+    assert listed.json()["total"] == 1
+    assert listed.json()["items"][0]["title"] == "integration dup news v2"
+
+
 def test_news_date_range_includes_full_to_date(integration_client):
     payload = {
         "source": "integration-date-boundary",
@@ -140,6 +165,37 @@ def test_minutes_upsert_and_filter(integration_client):
     assert listed.status_code == 200
     assert listed.json()["total"] == 1
     assert listed.json()["items"][0]["council"] == "seoul"
+
+
+def test_minutes_batch_with_duplicate_url_is_stable(integration_client):
+    payload = [
+        {
+            "council": "seoul",
+            "committee": "budget",
+            "session": "301",
+            "meeting_no": "301 4th",
+            "url": "https://example.com/minutes/int-dup-1",
+            "meeting_date": "2026-02-17",
+            "content": "minutes integration v1",
+        },
+        {
+            "council": "seoul",
+            "committee": "plenary",
+            "session": "301",
+            "meeting_no": "301 4th",
+            "url": "https://example.com/minutes/int-dup-1",
+            "meeting_date": "2026-02-17",
+            "content": "minutes integration v2",
+        },
+    ]
+    saved = integration_client.post("/api/minutes", json=payload)
+    assert saved.status_code == 201
+    assert saved.json() == {"inserted": 1, "updated": 0}
+
+    listed = integration_client.get("/api/minutes", params={"council": "seoul"})
+    assert listed.status_code == 200
+    assert listed.json()["total"] == 1
+    assert listed.json()["items"][0]["committee"] == "plenary"
 
 
 def test_segments_insert_and_filter(integration_client):

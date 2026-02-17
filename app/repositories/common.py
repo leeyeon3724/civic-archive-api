@@ -46,6 +46,20 @@ def to_json_recordset(items: list[dict[str, Any]]) -> str:
     return json.dumps(items, ensure_ascii=False, default=_json_default, separators=(",", ":"))
 
 
+def dedupe_rows_by_key(items: list[dict[str, Any]], *, key: str) -> list[dict[str, Any]]:
+    """Keep the last row per key while preserving relative order of retained rows."""
+    seen: set[Any] = set()
+    deduped_reversed: list[dict[str, Any]] = []
+    for item in reversed(items):
+        key_value = item.get(key)
+        if key_value in seen:
+            continue
+        seen.add(key_value)
+        deduped_reversed.append(item)
+    deduped_reversed.reverse()
+    return deduped_reversed
+
+
 def execute_paginated_query(
     *,
     list_sql: str,

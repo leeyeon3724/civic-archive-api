@@ -5,7 +5,7 @@ from typing import Any
 from sqlalchemy import text
 
 from app.ports.repositories import MinutesRepositoryPort
-from app.repositories.common import build_where_clause, execute_paginated_query, to_json_recordset
+from app.repositories.common import build_where_clause, dedupe_rows_by_key, execute_paginated_query, to_json_recordset
 from app.repositories.session_provider import ConnectionProvider, open_connection_scope
 
 
@@ -33,6 +33,7 @@ def upsert_minutes(
         }
         for minute in items
     ]
+    payload_rows = dedupe_rows_by_key(payload_rows, key="url")
 
     sql = text(
         """
