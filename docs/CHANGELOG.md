@@ -1,4 +1,4 @@
-﻿# 변경 이력
+# 변경 이력
 
 이 문서는 프로젝트의 주요 변경 사항을 기록합니다.
 
@@ -87,6 +87,9 @@
 - JWT 검증/인가 로직을 `app/security_jwt.py` 모듈로 분리해 `security.py` 책임을 단계적으로 축소
 - 날짜/시간 파싱 로직을 `app/parsing.py`로 통합해 `schemas`/`utils` 중복 구현을 제거
 - 테스트 더블(`StubConnection`)에 statement object 기록을 추가하고 일부 SQL 문자열 결합 검증을 파라미터 기반으로 전환
+- 저장소 루트에 `.editorconfig`를 추가해 UTF-8/LF 인코딩 정책을 명시하고 편집기별 인코딩 편차를 방지
+- 개발 의존성의 `pytest`를 `9.0.2`로 갱신하고 런타임 의존성의 `PyJWT` 최소 버전을 `2.11`로 상향
+- Dockerfile에서 `PORT`를 `ARG`/`ENV`로 일원화하고 `EXPOSE`/`CMD` 경로에서 동일 변수를 사용하도록 정리
 
 ### 수정됨
 
