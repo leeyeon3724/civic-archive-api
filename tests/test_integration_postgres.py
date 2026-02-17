@@ -100,6 +100,31 @@ def test_news_upsert_and_update(integration_client):
     assert listed.json()["items"][0]["title"] == "integration news updated"
 
 
+def test_news_date_range_includes_full_to_date(integration_client):
+    payload = {
+        "source": "integration-date-boundary",
+        "title": "integration boundary news",
+        "url": "https://example.com/news/int-boundary-1",
+        "published_at": "2026-02-17T10:00:00Z",
+    }
+    saved = integration_client.post("/api/news", json=payload)
+    assert saved.status_code == 201
+    assert saved.json() == {"inserted": 1, "updated": 0}
+
+    listed = integration_client.get(
+        "/api/news",
+        params={
+            "source": "integration-date-boundary",
+            "from": "2026-02-17",
+            "to": "2026-02-17",
+        },
+    )
+    assert listed.status_code == 200
+    body = listed.json()
+    assert body["total"] == 1
+    assert body["items"][0]["url"] == "https://example.com/news/int-boundary-1"
+
+
 def test_minutes_upsert_and_filter(integration_client):
     payload = {
         "council": "seoul",

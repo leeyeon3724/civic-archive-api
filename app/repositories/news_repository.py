@@ -75,7 +75,7 @@ def list_articles(
         params["date_from"] = date_from
 
     if date_to:
-        where.append("published_at <= :date_to")
+        where.append("published_at < (CAST(:date_to AS date) + INTERVAL '1 day')")
         params["date_to"] = date_to
 
     where_sql = build_where_clause(where)

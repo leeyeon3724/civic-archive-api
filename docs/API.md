@@ -95,6 +95,8 @@
 - 쿼리: `q`, `source`, `from`, `to`, `page`, `size`
 - 검색(`q`): `title`, `summary`, `content` (`ILIKE`)
 - 날짜 필터: `from`/`to`는 `YYYY-MM-DD` 형식 검증 후 `published_at` 기준 필터
+  - `from`: 해당 날짜 00:00:00부터 포함
+  - `to`: 해당 날짜 23:59:59까지 포함(일 단위 inclusive)
 
 목록 응답 `items[*]`:
 - `id`, `source`, `title`, `url`, `published_at`, `author`, `summary`, `keywords`, `created_at`, `updated_at`
