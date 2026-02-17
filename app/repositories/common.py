@@ -4,8 +4,6 @@ import json
 from datetime import date, datetime
 from typing import Any
 
-from sqlalchemy import text
-
 from app.repositories.session_provider import ConnectionProvider, open_connection_scope
 
 
@@ -30,10 +28,6 @@ def accumulate_upsert_result(result, *, inserted: int, updated: int) -> tuple[in
     if rowcount == 2:
         return inserted, updated + 1
     return inserted, updated
-
-
-def build_where_clause(where: list[str]) -> str:
-    return (" WHERE " + " AND ".join(where)) if where else ""
 
 
 def _json_default(value: Any) -> Any:
@@ -62,8 +56,8 @@ def dedupe_rows_by_key(items: list[dict[str, Any]], *, key: str) -> list[dict[st
 
 def execute_paginated_query(
     *,
-    list_sql: str,
-    count_sql: str,
+    list_stmt: Any,
+    count_stmt: Any,
     params: dict[str, Any],
     page: int,
     size: int,
@@ -71,9 +65,9 @@ def execute_paginated_query(
 ) -> tuple[list[dict[str, Any]], int]:
     with open_connection_scope(connection_provider) as conn:
         rows = conn.execute(
-            text(list_sql),
+            list_stmt,
             {**params, "limit": size, "offset": (page - 1) * size},
         ).mappings().all()
-        total = conn.execute(text(count_sql), params).scalar() or 0
+        total = conn.execute(count_stmt, params).scalar() or 0
 
     return [dict(row) for row in rows], int(total)

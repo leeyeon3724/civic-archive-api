@@ -2,11 +2,26 @@ from __future__ import annotations
 
 from typing import Any
 
-from sqlalchemy import text
+from sqlalchemy import Date, Text, bindparam, cast, column, func, or_, select, table, text
 
 from app.ports.repositories import NewsRepositoryPort
-from app.repositories.common import build_where_clause, dedupe_rows_by_key, execute_paginated_query, to_json_recordset
+from app.repositories.common import dedupe_rows_by_key, execute_paginated_query, to_json_recordset
 from app.repositories.session_provider import ConnectionProvider, open_connection_scope
+
+NEWS_ARTICLES = table(
+    "news_articles",
+    column("id"),
+    column("source"),
+    column("title"),
+    column("url"),
+    column("published_at"),
+    column("author"),
+    column("summary"),
+    column("content"),
+    column("keywords"),
+    column("created_at"),
+    column("updated_at"),
+)
 
 
 def upsert_articles(
@@ -88,45 +103,66 @@ def list_articles(
     size: int,
     connection_provider: ConnectionProvider,
 ) -> tuple[list[dict[str, Any]], int]:
-    where = []
+    conditions = []
     params: dict[str, Any] = {}
 
     if q:
-        where.append("(title ILIKE :q OR summary ILIKE :q OR content ILIKE :q)")
+        q_bind: Any = bindparam("q")
+        conditions.append(
+            or_(
+                cast(NEWS_ARTICLES.c.title, Text).ilike(q_bind),
+                cast(NEWS_ARTICLES.c.summary, Text).ilike(q_bind),
+                cast(NEWS_ARTICLES.c.content, Text).ilike(q_bind),
+            )
+        )
         params["q"] = f"%{q}%"
 
     if source:
-        where.append("source = :source")
+        conditions.append(NEWS_ARTICLES.c.source == bindparam("source"))
         params["source"] = source
 
     if date_from:
-        where.append("published_at >= :date_from")
+        conditions.append(NEWS_ARTICLES.c.published_at >= bindparam("date_from"))
         params["date_from"] = date_from
 
     if date_to:
-        where.append("published_at < (CAST(:date_to AS date) + INTERVAL '1 day')")
+        conditions.append(
+            NEWS_ARTICLES.c.published_at
+            < (cast(bindparam("date_to"), Date) + text("INTERVAL '1 day'"))
+        )
         params["date_to"] = date_to
 
-    where_sql = build_where_clause(where)
+    list_stmt = (
+        select(
+            NEWS_ARTICLES.c.id,
+            NEWS_ARTICLES.c.source,
+            NEWS_ARTICLES.c.title,
+            NEWS_ARTICLES.c.url,
+            NEWS_ARTICLES.c.published_at,
+            NEWS_ARTICLES.c.author,
+            NEWS_ARTICLES.c.summary,
+            NEWS_ARTICLES.c.keywords,
+            NEWS_ARTICLES.c.created_at,
+            NEWS_ARTICLES.c.updated_at,
+        )
+        .order_by(
+            func.coalesce(NEWS_ARTICLES.c.published_at, NEWS_ARTICLES.c.created_at).desc(),
+            NEWS_ARTICLES.c.id.desc(),
+        )
+        .limit(bindparam("limit"))
+        .offset(bindparam("offset"))
+    )
 
-    list_sql = f"""
-        SELECT
-            id, source, title, url, published_at, author, summary, keywords, created_at, updated_at
-        FROM news_articles
-        {where_sql}
-        ORDER BY COALESCE(published_at, created_at) DESC, id DESC
-        LIMIT :limit OFFSET :offset
-        """
+    count_stmt = select(func.count().label("total")).select_from(NEWS_ARTICLES)
 
-    count_sql = f"""
-        SELECT COUNT(*) AS total
-        FROM news_articles
-        {where_sql}
-        """
+    if conditions:
+        for condition in conditions:
+            list_stmt = list_stmt.where(condition)
+            count_stmt = count_stmt.where(condition)
 
     return execute_paginated_query(
-        list_sql=list_sql,
-        count_sql=count_sql,
+        list_stmt=list_stmt,
+        count_stmt=count_stmt,
         params=params,
         page=page,
         size=size,

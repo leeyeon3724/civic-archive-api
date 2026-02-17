@@ -2,11 +2,36 @@ from __future__ import annotations
 
 from typing import Any
 
-from sqlalchemy import text
+from sqlalchemy import Text, bindparam, cast, column, func, or_, select, table, text
 
 from app.ports.repositories import SegmentsRepositoryPort
-from app.repositories.common import build_where_clause, execute_paginated_query, to_json_recordset
+from app.repositories.common import execute_paginated_query, to_json_recordset
 from app.repositories.session_provider import ConnectionProvider, open_connection_scope
+
+COUNCIL_SPEECH_SEGMENTS = table(
+    "council_speech_segments",
+    column("id"),
+    column("council"),
+    column("committee"),
+    column("session"),
+    column("meeting_no"),
+    column("meeting_no_combined"),
+    column("meeting_date"),
+    column("content"),
+    column("summary"),
+    column("subject"),
+    column("tag"),
+    column("importance"),
+    column("moderator"),
+    column("questioner"),
+    column("answerer"),
+    column("party"),
+    column("constituency"),
+    column("department"),
+    column("dedupe_hash"),
+    column("created_at"),
+    column("updated_at"),
+)
 
 
 def insert_segments(
@@ -123,84 +148,106 @@ def list_segments(
     size: int,
     connection_provider: ConnectionProvider,
 ) -> tuple[list[dict[str, Any]], int]:
-    where = []
+    conditions = []
     params: dict[str, Any] = {}
 
     if q:
-        where.append(
-            "(" 
-            "council ILIKE :q OR committee ILIKE :q OR \"session\" ILIKE :q "
-            "OR content ILIKE :q OR summary ILIKE :q OR subject ILIKE :q "
-            "OR party ILIKE :q OR constituency ILIKE :q OR department ILIKE :q "
-            "OR CAST(tag AS TEXT) ILIKE :q "
-            "OR CAST(questioner AS TEXT) ILIKE :q "
-            "OR CAST(answerer AS TEXT) ILIKE :q"
-            ")"
+        q_bind: Any = bindparam("q")
+        conditions.append(
+            or_(
+                cast(COUNCIL_SPEECH_SEGMENTS.c.council, Text).ilike(q_bind),
+                cast(COUNCIL_SPEECH_SEGMENTS.c.committee, Text).ilike(q_bind),
+                cast(COUNCIL_SPEECH_SEGMENTS.c["session"], Text).ilike(q_bind),
+                cast(COUNCIL_SPEECH_SEGMENTS.c.content, Text).ilike(q_bind),
+                cast(COUNCIL_SPEECH_SEGMENTS.c.summary, Text).ilike(q_bind),
+                cast(COUNCIL_SPEECH_SEGMENTS.c.subject, Text).ilike(q_bind),
+                cast(COUNCIL_SPEECH_SEGMENTS.c.party, Text).ilike(q_bind),
+                cast(COUNCIL_SPEECH_SEGMENTS.c.constituency, Text).ilike(q_bind),
+                cast(COUNCIL_SPEECH_SEGMENTS.c.department, Text).ilike(q_bind),
+                cast(COUNCIL_SPEECH_SEGMENTS.c.tag, Text).ilike(q_bind),
+                cast(COUNCIL_SPEECH_SEGMENTS.c.questioner, Text).ilike(q_bind),
+                cast(COUNCIL_SPEECH_SEGMENTS.c.answerer, Text).ilike(q_bind),
+            )
         )
         params["q"] = f"%{q}%"
 
     if council:
-        where.append("council = :council")
+        conditions.append(COUNCIL_SPEECH_SEGMENTS.c.council == bindparam("council"))
         params["council"] = council
 
     if committee:
-        where.append("committee = :committee")
+        conditions.append(COUNCIL_SPEECH_SEGMENTS.c.committee == bindparam("committee"))
         params["committee"] = committee
 
     if session:
-        where.append('"session" = :session')
+        conditions.append(COUNCIL_SPEECH_SEGMENTS.c["session"] == bindparam("session"))
         params["session"] = session
 
     if meeting_no:
-        where.append("meeting_no_combined = :meeting_no")
+        conditions.append(COUNCIL_SPEECH_SEGMENTS.c.meeting_no_combined == bindparam("meeting_no"))
         params["meeting_no"] = meeting_no
 
     if importance is not None:
-        where.append("importance = :importance")
+        conditions.append(COUNCIL_SPEECH_SEGMENTS.c.importance == bindparam("importance"))
         params["importance"] = importance
 
     if party:
-        where.append("party = :party")
+        conditions.append(COUNCIL_SPEECH_SEGMENTS.c.party == bindparam("party"))
         params["party"] = party
 
     if constituency:
-        where.append("constituency = :constituency")
+        conditions.append(COUNCIL_SPEECH_SEGMENTS.c.constituency == bindparam("constituency"))
         params["constituency"] = constituency
 
     if department:
-        where.append("department = :department")
+        conditions.append(COUNCIL_SPEECH_SEGMENTS.c.department == bindparam("department"))
         params["department"] = department
 
     if date_from:
-        where.append("meeting_date >= :date_from")
+        conditions.append(COUNCIL_SPEECH_SEGMENTS.c.meeting_date >= bindparam("date_from"))
         params["date_from"] = date_from
 
     if date_to:
-        where.append("meeting_date <= :date_to")
+        conditions.append(COUNCIL_SPEECH_SEGMENTS.c.meeting_date <= bindparam("date_to"))
         params["date_to"] = date_to
 
-    where_sql = build_where_clause(where)
+    list_stmt = (
+        select(
+            COUNCIL_SPEECH_SEGMENTS.c.id,
+            COUNCIL_SPEECH_SEGMENTS.c.council,
+            COUNCIL_SPEECH_SEGMENTS.c.committee,
+            COUNCIL_SPEECH_SEGMENTS.c["session"],
+            COUNCIL_SPEECH_SEGMENTS.c.meeting_no_combined.label("meeting_no"),
+            COUNCIL_SPEECH_SEGMENTS.c.meeting_date,
+            COUNCIL_SPEECH_SEGMENTS.c.summary,
+            COUNCIL_SPEECH_SEGMENTS.c.subject,
+            COUNCIL_SPEECH_SEGMENTS.c.tag,
+            COUNCIL_SPEECH_SEGMENTS.c.importance,
+            COUNCIL_SPEECH_SEGMENTS.c.moderator,
+            COUNCIL_SPEECH_SEGMENTS.c.questioner,
+            COUNCIL_SPEECH_SEGMENTS.c.answerer,
+            COUNCIL_SPEECH_SEGMENTS.c.party,
+            COUNCIL_SPEECH_SEGMENTS.c.constituency,
+            COUNCIL_SPEECH_SEGMENTS.c.department,
+        )
+        .order_by(
+            func.coalesce(COUNCIL_SPEECH_SEGMENTS.c.meeting_date, COUNCIL_SPEECH_SEGMENTS.c.created_at).desc(),
+            COUNCIL_SPEECH_SEGMENTS.c.id.desc(),
+        )
+        .limit(bindparam("limit"))
+        .offset(bindparam("offset"))
+    )
 
-    list_sql = f"""
-        SELECT
-            id, council, committee, "session", meeting_no_combined AS meeting_no, meeting_date,
-            summary, subject, tag, importance, moderator, questioner, answerer,
-            party, constituency, department
-        FROM council_speech_segments
-        {where_sql}
-        ORDER BY COALESCE(meeting_date, created_at) DESC, id DESC
-        LIMIT :limit OFFSET :offset
-        """
+    count_stmt = select(func.count().label("total")).select_from(COUNCIL_SPEECH_SEGMENTS)
 
-    count_sql = f"""
-        SELECT COUNT(*) AS total
-        FROM council_speech_segments
-        {where_sql}
-        """
+    if conditions:
+        for condition in conditions:
+            list_stmt = list_stmt.where(condition)
+            count_stmt = count_stmt.where(condition)
 
     return execute_paginated_query(
-        list_sql=list_sql,
-        count_sql=count_sql,
+        list_stmt=list_stmt,
+        count_stmt=count_stmt,
         params=params,
         page=page,
         size=size,
