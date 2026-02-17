@@ -37,6 +37,11 @@ Conventional Commits를 사용하며, 즉시 강제 규칙은 아래와 같습�
 - `docs(api): update payload size guard behavior`
 - `chore(ci): add commit message validation workflow`
 
+적용 범위:
+
+- 기존 `main` 히스토리는 소급 수정하지 않습니다.
+- 정책은 신규 커밋(푸시/PR 범위)에 즉시 적용됩니다.
+
 검사 명령:
 
 - `python scripts/check_commit_messages.py --rev-range origin/main..HEAD --mode fail`
@@ -75,14 +80,12 @@ PR 본문에 아래 항목을 포함합니다.
 - 성능 민감 변경 PR
   - `python scripts/benchmark_queries.py --profile staging` 결과 첨부
   - baseline 대비 benchmark delta(`ms` 또는 `%`)를 PR 본문에 기록
+  - 처리량/성능 가드 변경 시 oversized payload(`413 PAYLOAD_TOO_LARGE`) 동작 확인 결과 첨부
 - 보안/공급망 변경 PR
   - `pip-audit -r requirements.txt -r requirements-dev.txt`
   - 필요 시 SBOM 갱신/첨부 (`cyclonedx-py requirements ...`)
 - 운영/가용성 변경 PR
   - `python scripts/check_runtime_health.py --base-url <target>`
-- 처리량/성능 가드 변경 PR
-  - `python scripts/benchmark_queries.py --profile staging`
-  - oversized payload(`413 PAYLOAD_TOO_LARGE`) 동작 확인 결과 첨부
 
 ## 코드 리뷰 포인트
 

@@ -65,7 +65,7 @@
 - [x] Extend `check_version_consistency.py` with changelog structure checks
 - [x] Add `EXPECTED_VERSION` support for release-tag validation
 - [x] Enforce release workflow to run version consistency script
-- [ ] Add dedicated script unit tests (deferred to P3 quality pass)
+- Note: dedicated script-unit coverage is tracked as cross-cutting tooling backlog.
 
 ## Definition of Done (P2)
 
@@ -166,7 +166,7 @@
 - [x] Add request-size/load-shedding guard policy draft
 - [x] Link throughput guardrails to runbook checklist
 
-## Definition of Done (P5-In Progress)
+## Definition of Done (P5-Current)
 
 - Unit/contract tests pass
 - Docs-route contract check passes
@@ -174,3 +174,7 @@
 - Version consistency check passes
 - SLO policy check passes
 - `docs/CHANGELOG.md` updated
+
+## Deferred Cross-Cutting Backlog
+
+- Add dedicated unit tests for remaining policy scripts (including `check_version_consistency.py`)

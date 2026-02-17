@@ -1,4 +1,4 @@
-# Performance Policy
+﻿# Performance Policy
 
 이 문서는 조회 API 성능 가드레일과 벤치마크 임계값 정책을 정의합니다.
 
@@ -84,3 +84,4 @@ python scripts/benchmark_queries.py --profile prod --runs 40 --seed-rows 500
   - reject request with `413 PAYLOAD_TOO_LARGE`
   - include `details` with configured limit and observed value
 - 운영 체크리스트 연계: `docs/OPERATIONS.md`의 Stabilize/Runtime checks 항목에서 확인
+

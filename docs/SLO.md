@@ -74,7 +74,7 @@ Before deploying to production:
 3. Run pre-deploy runtime checks (target environment):
    - `python scripts/check_runtime_health.py --base-url <target-base-url>`
 4. Run benchmark regression checks:
-   - `BENCH_FAIL_THRESHOLD_MS=250 BENCH_FAIL_P95_THRESHOLD_MS=400 python scripts/benchmark_queries.py`
+   - `BENCH_PROFILE=staging BENCH_FAIL_THRESHOLD_MS=250 BENCH_FAIL_P95_THRESHOLD_MS=400 python scripts/benchmark_queries.py`
 
 ## Incident Handling Linkage
 

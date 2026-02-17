@@ -40,6 +40,8 @@
 - benchmark 스크립트에 시나리오 태그/프로파일 임계값(`dev/staging/prod`)과 다중 임계값 평가를 추가
 - `/api/*` write 요청에 payload 크기/배치 수 상한 가드를 적용하고 초과 시 `413 PAYLOAD_TOO_LARGE`를 반환
 - CI에 커밋 메시지 정책 강제 단계 추가 (`.github/workflows/commit-message.yml`)
+- 요청 본문 상한 가드를 강화해 `Content-Length`와 실제 본문 길이를 함께 검증하도록 조정
+- 운영/성능/백로그 문서의 벤치마크 명령 및 상태 표기를 정합성 기준에 맞게 정리
 
 ### 수정됨
 

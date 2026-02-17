@@ -44,7 +44,7 @@
   - Redis 장애 재시도 쿨다운: `RATE_LIMIT_REDIS_FAILURE_COOLDOWN_SECONDS`
   - 프록시 환경에서는 `TRUSTED_PROXY_CIDRS`에 지정한 CIDR에서만 `X-Forwarded-For`를 신뢰
 - write 요청(`/api/*` + `POST/PUT/PATCH`)은 payload 상한 적용
-  - 요청 본문 크기 상한: `MAX_REQUEST_BODY_BYTES` (초과 시 `413 PAYLOAD_TOO_LARGE`)
+  - 요청 본문 크기 상한: `MAX_REQUEST_BODY_BYTES` (Content-Length 사전 검증 + 실제 본문 길이 검증, 초과 시 `413 PAYLOAD_TOO_LARGE`)
   - 배치 item 상한: `INGEST_MAX_BATCH_ITEMS` (초과 시 `413 PAYLOAD_TOO_LARGE`)
 
 ## 유틸리티 엔드포인트
