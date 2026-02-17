@@ -15,6 +15,7 @@ from app.observability import register_observability
 from app.routes import register_routes
 from app.schemas import EchoResponse, ErrorResponse, HealthResponse
 from app.security import build_api_key_dependency, build_rate_limit_dependency
+from app.version import APP_VERSION
 
 OPENAPI_TAGS = [
     {"name": "system", "description": "System and health endpoints"},
@@ -34,7 +35,7 @@ def create_app(config=None):
 
     api = FastAPI(
         title="Civic Archive API",
-        version="1.1.0",
+        version=APP_VERSION,
         description="Local council archive API with FastAPI + PostgreSQL",
         openapi_tags=OPENAPI_TAGS,
     )
@@ -43,6 +44,10 @@ def create_app(config=None):
         raise RuntimeError("BOOTSTRAP_TABLES_ON_STARTUP is disabled. Run 'alembic upgrade head' before startup.")
     if config.REQUIRE_API_KEY and not (config.API_KEY or "").strip():
         raise RuntimeError("REQUIRE_API_KEY=1 requires API_KEY to be set.")
+    if config.rate_limit_backend not in {"memory", "redis"}:
+        raise RuntimeError("RATE_LIMIT_BACKEND must be one of: memory, redis.")
+    if config.rate_limit_backend == "redis" and not (config.REDIS_URL or "").strip():
+        raise RuntimeError("RATE_LIMIT_BACKEND=redis requires REDIS_URL to be set.")
 
     api.add_middleware(
         CORSMiddleware,

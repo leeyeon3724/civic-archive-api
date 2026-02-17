@@ -28,7 +28,7 @@ def _route_template(request: Request) -> str:
     route_path = getattr(route, "path", None)
     if route_path:
         return str(route_path)
-    return request.url.path
+    return "/_unmatched"
 
 
 def register_observability(api: FastAPI) -> None:

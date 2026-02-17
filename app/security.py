@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hmac
+import logging
 import threading
 import time
 from typing import Callable
@@ -9,9 +10,19 @@ from fastapi import Header, Request
 
 from app.errors import http_error
 
+try:
+    import redis
+    from redis.exceptions import NoScriptError, RedisError
+except Exception:  # pragma: no cover - exercised only when redis is unavailable.
+    redis = None  # type: ignore[assignment]
+    RedisError = Exception  # type: ignore[assignment]
+    NoScriptError = Exception  # type: ignore[assignment]
+
+logger = logging.getLogger("civic_archive.security")
+
 
 class InMemoryRateLimiter:
-    """Simple fixed-window rate limiter keyed by client identity."""
+    """Fixed-window limiter keyed by client identity."""
 
     def __init__(self, requests_per_minute: int) -> None:
         self.requests_per_minute = max(0, requests_per_minute)
@@ -34,7 +45,110 @@ class InMemoryRateLimiter:
 
             count += 1
             self._windows[key] = (prev_window, count)
+            self._prune(now_window)
             return count <= self.requests_per_minute
+
+    def _prune(self, now_window: int) -> None:
+        if len(self._windows) < 4096:
+            return
+        min_window = now_window - 1
+        self._windows = {k: v for k, v in self._windows.items() if v[0] >= min_window}
+
+
+class RedisRateLimiter:
+    """Redis-backed fixed-window limiter keyed by client identity."""
+
+    _WINDOW_SCRIPT = """
+local current = redis.call("INCR", KEYS[1])
+if current == 1 then
+  redis.call("EXPIRE", KEYS[1], tonumber(ARGV[1]))
+end
+return current
+"""
+
+    def __init__(
+        self,
+        *,
+        requests_per_minute: int,
+        redis_url: str,
+        key_prefix: str,
+        window_seconds: int,
+    ) -> None:
+        self.requests_per_minute = max(0, requests_per_minute)
+        self.key_prefix = key_prefix
+        self.window_seconds = max(1, window_seconds)
+        self._script_sha: str | None = None
+        self._client = None
+
+        if not self.enabled:
+            return
+
+        if redis is None:
+            raise RuntimeError("redis package is required for RATE_LIMIT_BACKEND=redis.")
+
+        self._client = redis.Redis.from_url(
+            redis_url,
+            socket_connect_timeout=0.2,
+            socket_timeout=0.2,
+            decode_responses=False,
+        )
+
+    @property
+    def enabled(self) -> bool:
+        return self.requests_per_minute > 0
+
+    def allow(self, key: str) -> bool:
+        if not self.enabled:
+            return True
+        if self._client is None:
+            return True
+
+        bucket = int(time.time() // 60)
+        redis_key = f"{self.key_prefix}:{bucket}:{key}"
+
+        try:
+            current = int(self._eval_counter(redis_key))
+        except RedisError:
+            logger.warning("rate_limit_redis_error", extra={"client_key": key})
+            # Fail-open to preserve API availability when Redis is transiently unavailable.
+            return True
+
+        return current <= self.requests_per_minute
+
+    def _eval_counter(self, redis_key: str) -> int:
+        assert self._client is not None
+        if self._script_sha is None:
+            self._script_sha = self._client.script_load(self._WINDOW_SCRIPT)
+
+        try:
+            return int(self._client.evalsha(self._script_sha, 1, redis_key, self.window_seconds))
+        except NoScriptError:
+            return int(self._client.eval(self._WINDOW_SCRIPT, 1, redis_key, self.window_seconds))
+
+
+def _client_key(request: Request) -> str:
+    forwarded_for = request.headers.get("X-Forwarded-For")
+    if forwarded_for:
+        first_hop = forwarded_for.split(",")[0].strip()
+        if first_hop:
+            return first_hop
+    return request.client.host if request.client else "unknown"
+
+
+def _build_rate_limiter(config):
+    if config.rate_limit_backend == "redis":
+        redis_url = (config.REDIS_URL or "").strip()
+        if not redis_url:
+            raise RuntimeError("RATE_LIMIT_BACKEND=redis requires REDIS_URL to be set.")
+        return RedisRateLimiter(
+            requests_per_minute=config.RATE_LIMIT_PER_MINUTE,
+            redis_url=redis_url,
+            key_prefix=config.RATE_LIMIT_REDIS_PREFIX,
+            window_seconds=config.RATE_LIMIT_REDIS_WINDOW_SECONDS,
+        )
+    if config.rate_limit_backend == "memory":
+        return InMemoryRateLimiter(config.RATE_LIMIT_PER_MINUTE)
+    raise RuntimeError("RATE_LIMIT_BACKEND must be one of: memory, redis.")
 
 
 def build_api_key_dependency(config) -> Callable:
@@ -51,14 +165,12 @@ def build_api_key_dependency(config) -> Callable:
 
 
 def build_rate_limit_dependency(config) -> Callable:
-    limiter = InMemoryRateLimiter(config.RATE_LIMIT_PER_MINUTE)
+    limiter = _build_rate_limiter(config)
 
     async def verify_rate_limit(request: Request) -> None:
         if not limiter.enabled:
             return
-
-        client_host = request.client.host if request.client else "unknown"
-        if not limiter.allow(client_host):
+        if not limiter.allow(_client_key(request)):
             raise http_error(429, "RATE_LIMITED", "Too Many Requests")
 
     return verify_rate_limit

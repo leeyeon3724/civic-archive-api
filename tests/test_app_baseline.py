@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 
 from app import create_app
 from app.config import Config
+from app.version import APP_VERSION
 
 def _assert_not_found_error(payload):
     assert payload["error"] == "Not Found"
@@ -271,6 +272,25 @@ def test_metrics_endpoint_exposes_prometheus_text(client):
     assert "civic_archive_http_requests_total" in body
     assert "civic_archive_http_request_duration_seconds" in body
 
+
+def test_metrics_uses_low_cardinality_label_for_unmatched_route(client):
+    unmatched_path = "/no-such-route-cardinality-unique-case"
+    missing = client.get(unmatched_path)
+    assert missing.status_code == 404
+
+    metrics = client.get("/metrics")
+    assert metrics.status_code == 200
+    body = metrics.text
+    assert 'path="/_unmatched"' in body
+    assert f'path="{unmatched_path}"' not in body
+
+
+def test_openapi_version_uses_app_version_constant(client):
+    resp = client.get("/openapi.json")
+    assert resp.status_code == 200
+    assert resp.get_json()["info"]["version"] == APP_VERSION
+
+
 def test_api_key_required_for_protected_endpoint(make_engine):
     with patch("app.database.create_engine", return_value=make_engine(lambda *_: StubResult())):
         app = create_app(
@@ -311,3 +331,62 @@ def test_rate_limit_enforced_for_protected_endpoint(make_engine):
         assert body["code"] == "RATE_LIMITED"
         assert body["message"] == "Too Many Requests"
         assert body.get("request_id")
+
+
+def test_rate_limit_backend_rejects_invalid_value(make_engine):
+    with patch("app.database.create_engine", return_value=make_engine(lambda *_: StubResult())):
+        with pytest.raises(RuntimeError):
+            create_app(
+                Config(
+                    RATE_LIMIT_BACKEND="invalid-backend",
+                    RATE_LIMIT_PER_MINUTE=1,
+                )
+            )
+
+
+def test_rate_limit_redis_backend_requires_redis_url(make_engine):
+    with patch("app.database.create_engine", return_value=make_engine(lambda *_: StubResult())):
+        with pytest.raises(RuntimeError):
+            create_app(
+                Config(
+                    RATE_LIMIT_BACKEND="redis",
+                    RATE_LIMIT_PER_MINUTE=1,
+                    REDIS_URL=None,
+                )
+            )
+
+
+def test_rate_limit_redis_backend_is_usable_with_custom_limiter(make_engine):
+    class FakeRedisRateLimiter:
+        def __init__(self, *, requests_per_minute: int, redis_url: str, key_prefix: str, window_seconds: int) -> None:
+            assert requests_per_minute == 1
+            assert redis_url == "redis://localhost:6379/0"
+            assert key_prefix == "test-prefix"
+            assert window_seconds == 70
+            self.enabled = True
+            self.calls = 0
+
+        def allow(self, _key: str) -> bool:
+            self.calls += 1
+            return self.calls <= 1
+
+    with patch("app.database.create_engine", return_value=make_engine(lambda *_: StubResult())), patch(
+        "app.security.RedisRateLimiter",
+        FakeRedisRateLimiter,
+    ):
+        app = create_app(
+            Config(
+                RATE_LIMIT_BACKEND="redis",
+                REDIS_URL="redis://localhost:6379/0",
+                RATE_LIMIT_REDIS_PREFIX="test-prefix",
+                RATE_LIMIT_REDIS_WINDOW_SECONDS=70,
+                RATE_LIMIT_PER_MINUTE=1,
+            )
+        )
+
+    with TestClient(app) as tc:
+        first = tc.post("/api/echo", json={"n": 1})
+        assert first.status_code == 200
+
+        second = tc.post("/api/echo", json={"n": 2})
+        assert second.status_code == 429

@@ -5,3 +5,4 @@ psycopg[binary]>=3.2
 alembic==1.18.4
 pydantic-settings>=2.7
 prometheus-client>=0.22
+redis>=5.0

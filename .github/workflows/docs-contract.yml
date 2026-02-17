@@ -48,6 +48,9 @@ jobs:
       - name: Enforce schema policy (no manual DDL)
         run: python scripts/check_schema_policy.py
 
+      - name: Enforce version consistency (single source + changelog)
+        run: python scripts/check_version_consistency.py
+
       - name: Apply Alembic migrations (online, required)
         run: python -m alembic upgrade head
 

@@ -17,6 +17,18 @@
       timeout: 5s
       retries: 10
 
+  redis:
+    image: redis:7-alpine
+    container_name: civic-archive-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
   api:
     build: .
     container_name: civic-archive-api
@@ -33,6 +45,10 @@
       BOOTSTRAP_TABLES_ON_STARTUP: "0"
       REQUIRE_API_KEY: "0"
       RATE_LIMIT_PER_MINUTE: "0"
+      RATE_LIMIT_BACKEND: memory
+      REDIS_URL: redis://redis:6379/0
+      RATE_LIMIT_REDIS_PREFIX: civic_archive:rate_limit
+      RATE_LIMIT_REDIS_WINDOW_SECONDS: "65"
       ALLOWED_HOSTS: "*"
       PORT: 8000
     ports:

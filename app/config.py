@@ -28,6 +28,10 @@ class Config(BaseSettings):
     REQUIRE_API_KEY: bool = False
     API_KEY: str | None = None
     RATE_LIMIT_PER_MINUTE: int = 0
+    RATE_LIMIT_BACKEND: str = "memory"
+    REDIS_URL: str | None = None
+    RATE_LIMIT_REDIS_PREFIX: str = "civic_archive:rate_limit"
+    RATE_LIMIT_REDIS_WINDOW_SECONDS: int = 65
     CORS_ALLOW_ORIGINS: str = "*"
     CORS_ALLOW_METHODS: str = "GET,POST,DELETE,OPTIONS"
     CORS_ALLOW_HEADERS: str = "*"
@@ -64,3 +68,8 @@ class Config(BaseSettings):
     def allowed_hosts_list(self) -> List[str]:
         values = self._parse_csv(self.ALLOWED_HOSTS)
         return values or ["*"]
+
+    @property
+    def rate_limit_backend(self) -> str:
+        value = (self.RATE_LIMIT_BACKEND or "").strip().lower()
+        return value or "memory"
