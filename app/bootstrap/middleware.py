@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable, MutableMapping
-from typing import Any
+from typing import Any, cast
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -55,7 +55,8 @@ def register_core_middleware(api: FastAPI, config: Config) -> None:
                         },
                     )
             received_bytes = 0
-            original_receive: Callable[[], Awaitable[ReceiveMessage]] = request._receive
+            receive_attr = "_receive"
+            original_receive = cast(Callable[[], Awaitable[ReceiveMessage]], getattr(request, receive_attr))
 
             async def guarded_receive() -> ReceiveMessage:
                 nonlocal received_bytes
@@ -66,39 +67,39 @@ def register_core_middleware(api: FastAPI, config: Config) -> None:
                 chunk = message.get("body", b"") or b""
                 received_bytes += len(chunk)
                 if received_bytes > max_request_body_bytes:
-                    details = {
+                    overflow_details = {
                         "max_request_body_bytes": max_request_body_bytes,
                         "request_body_bytes": received_bytes,
                     }
                     if content_length is not None:
-                        details["content_length"] = content_length
-                    setattr(request.state, guard_details_attr, details)
+                        overflow_details["content_length"] = content_length
+                    setattr(request.state, guard_details_attr, overflow_details)
                     # Stop reading request body as soon as the limit is exceeded.
                     return {"type": "http.request", "body": b"", "more_body": False}
                 return message
 
-            request._receive = guarded_receive
+            setattr(request, receive_attr, guarded_receive)
         try:
             response = await call_next(request)
         except Exception:
-            details = getattr(request.state, guard_details_attr, None)
-            if details is not None:
+            guard_details = getattr(request.state, guard_details_attr, None)
+            if guard_details is not None:
                 return error_response(
                     request,
                     status_code=413,
                     code="PAYLOAD_TOO_LARGE",
                     message="Payload Too Large",
-                    details=details,
+                    details=guard_details,
                 )
             raise
 
-        details = getattr(request.state, guard_details_attr, None)
-        if details is not None:
+        guard_details = getattr(request.state, guard_details_attr, None)
+        if guard_details is not None:
             return error_response(
                 request,
                 status_code=413,
                 code="PAYLOAD_TOO_LARGE",
                 message="Payload Too Large",
-                details=details,
+                details=guard_details,
             )
         return response

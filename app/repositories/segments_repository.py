@@ -4,7 +4,6 @@ from typing import Any
 
 from sqlalchemy import Text, bindparam, cast, column, func, or_, select, table, text
 
-from app.ports.repositories import SegmentsRepositoryPort
 from app.repositories.common import execute_paginated_query, to_json_recordset
 from app.repositories.session_provider import ConnectionProvider, open_connection_scope
 
@@ -290,7 +289,7 @@ def delete_segment(
     return result.rowcount > 0
 
 
-class SegmentsRepository(SegmentsRepositoryPort):
+class SegmentsRepository:
     def __init__(self, *, connection_provider: ConnectionProvider) -> None:
         self._connection_provider = connection_provider
 

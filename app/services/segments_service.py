@@ -122,7 +122,7 @@ def parse_importance_query(raw: str | None) -> int | None:
     return value
 
 
-class SegmentsService(SegmentsServicePort):
+class SegmentsService:
     def __init__(self, *, repository: SegmentsRepositoryPort) -> None:
         self._repository = repository
 

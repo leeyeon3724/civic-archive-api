@@ -104,6 +104,33 @@ def _build_request_log_payload(
     }
 
 
+def metric_status_label(status_code: int) -> str:
+    return _metric_status_label(status_code)
+
+
+def status_code_from_exception(exc: Exception) -> int:
+    return _status_code_from_exception(exc)
+
+
+def build_request_log_payload(
+    *,
+    request_id: str,
+    method: str,
+    path: str,
+    status_code: int,
+    elapsed_seconds: float,
+    client_ip: str | None,
+) -> dict[str, str | int | float | None]:
+    return _build_request_log_payload(
+        request_id=request_id,
+        method=method,
+        path=path,
+        status_code=status_code,
+        elapsed_seconds=elapsed_seconds,
+        client_ip=client_ip,
+    )
+
+
 def _observe_request_metrics(*, method: str, path: str, status_code: int, elapsed_seconds: float) -> None:
     method_label = _metric_method_label(method)
     status_label = _metric_status_label(status_code)

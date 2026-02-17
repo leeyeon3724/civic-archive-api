@@ -30,7 +30,7 @@ def _normalize_article(item: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-class NewsService(NewsServicePort):
+class NewsService:
     def __init__(self, *, repository: NewsRepositoryPort) -> None:
         self._repository = repository
 

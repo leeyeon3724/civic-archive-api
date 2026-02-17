@@ -1,8 +1,11 @@
 import logging
+from collections.abc import Generator
+from contextlib import contextmanager
 from typing import Any
 
 from fastapi import Depends, FastAPI
 from sqlalchemy import text
+from sqlalchemy.engine import Connection
 
 from app.bootstrap import (
     register_core_middleware,
@@ -33,11 +36,11 @@ OPENAPI_TAGS: list[dict[str, str]] = [
 logger = logging.getLogger("civic_archive.api")
 
 
-def create_app(config: Config | None = None) -> FastAPI:
-    if config is None:
-        config = Config()
+def create_app(app_config: Config | None = None) -> FastAPI:
+    if app_config is None:
+        app_config = Config()
 
-    configure_logging(level=config.LOG_LEVEL, json_logs=config.LOG_JSON)
+    configure_logging(level=app_config.LOG_LEVEL, json_logs=app_config.LOG_JSON)
 
     api = FastAPI(
         title="Civic Archive API",
@@ -45,28 +48,34 @@ def create_app(config: Config | None = None) -> FastAPI:
         description="Local council archive API with FastAPI + PostgreSQL",
         openapi_tags=OPENAPI_TAGS,
     )
-    api.state.config = config
+    api.state.config = app_config
 
-    validate_startup_config(config)
-    register_core_middleware(api, config)
+    validate_startup_config(app_config)
+    register_core_middleware(api, app_config)
 
     db_engine = init_db(
-        config.database_url,
-        pool_size=config.DB_POOL_SIZE,
-        max_overflow=config.DB_MAX_OVERFLOW,
-        pool_timeout_seconds=config.DB_POOL_TIMEOUT_SECONDS,
-        pool_recycle_seconds=config.DB_POOL_RECYCLE_SECONDS,
-        connect_timeout_seconds=config.DB_CONNECT_TIMEOUT_SECONDS,
-        statement_timeout_ms=config.DB_STATEMENT_TIMEOUT_MS,
+        app_config.database_url,
+        pool_size=app_config.DB_POOL_SIZE,
+        max_overflow=app_config.DB_MAX_OVERFLOW,
+        pool_timeout_seconds=app_config.DB_POOL_TIMEOUT_SECONDS,
+        pool_recycle_seconds=app_config.DB_POOL_RECYCLE_SECONDS,
+        connect_timeout_seconds=app_config.DB_CONNECT_TIMEOUT_SECONDS,
+        statement_timeout_ms=app_config.DB_STATEMENT_TIMEOUT_MS,
     )
+
+    @contextmanager
+    def connection_provider() -> Generator[Connection, None, None]:
+        with db_engine.begin() as conn:
+            yield conn
+
     api.state.db_engine = db_engine
-    api.state.connection_provider = db_engine.begin
+    api.state.connection_provider = connection_provider
 
     register_observability(api)
 
-    api_key_dependency = build_api_key_dependency(config)
-    jwt_dependency = build_jwt_dependency(config)
-    rate_limit_dependency = build_rate_limit_dependency(config)
+    api_key_dependency = build_api_key_dependency(app_config)
+    jwt_dependency = build_jwt_dependency(app_config)
+    rate_limit_dependency = build_rate_limit_dependency(app_config)
     protected_dependencies: list[Any] = [
         Depends(api_key_dependency),
         Depends(jwt_dependency),
@@ -86,7 +95,7 @@ def create_app(config: Config | None = None) -> FastAPI:
         api,
         protected_dependencies=protected_dependencies,
         db_health_check=db_health_check,
-        rate_limit_health_check=lambda: check_rate_limit_backend_health(config),
+        rate_limit_health_check=lambda: check_rate_limit_backend_health(app_config),
     )
     register_exception_handlers(api, logger=logger)
 

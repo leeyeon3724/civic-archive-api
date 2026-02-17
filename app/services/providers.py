@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import cast
+
 from fastapi import Request
 
 from app.ports.services import MinutesServicePort, NewsServicePort, SegmentsServicePort
@@ -13,7 +15,7 @@ def get_request_connection_provider(request: Request) -> ConnectionProvider:
     provider = getattr(request.app.state, "connection_provider", None)
     if not callable(provider):
         raise RuntimeError("app.state.connection_provider is not configured")
-    return provider
+    return cast(ConnectionProvider, provider)
 
 
 def get_news_service(request: Request) -> NewsServicePort:

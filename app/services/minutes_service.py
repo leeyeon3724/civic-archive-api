@@ -45,7 +45,7 @@ def _normalize_minutes(item: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-class MinutesService(MinutesServicePort):
+class MinutesService:
     def __init__(self, *, repository: MinutesRepositoryPort) -> None:
         self._repository = repository
 

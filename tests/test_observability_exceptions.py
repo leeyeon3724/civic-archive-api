@@ -2,9 +2,9 @@ from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.observability import (
-    _build_request_log_payload,
-    _metric_status_label,
-    _status_code_from_exception,
+    build_request_log_payload,
+    metric_status_label,
+    status_code_from_exception,
 )
 
 
@@ -18,23 +18,23 @@ def test_status_code_from_exception_maps_validation_http_and_unknown():
             }
         ]
     )
-    assert _status_code_from_exception(validation_exc) == 400
+    assert status_code_from_exception(validation_exc) == 400
 
     http_exc = StarletteHTTPException(status_code=403, detail="Forbidden")
-    assert _status_code_from_exception(http_exc) == 403
+    assert status_code_from_exception(http_exc) == 403
 
-    assert _status_code_from_exception(RuntimeError("boom")) == 500
+    assert status_code_from_exception(RuntimeError("boom")) == 500
 
 
 def test_metric_status_label_falls_back_for_invalid_status():
-    assert _metric_status_label(200) == "200"
-    assert _metric_status_label(599) == "599"
-    assert _metric_status_label(0) == "000"
-    assert _metric_status_label(700) == "000"
+    assert metric_status_label(200) == "200"
+    assert metric_status_label(599) == "599"
+    assert metric_status_label(0) == "000"
+    assert metric_status_label(700) == "000"
 
 
 def test_build_request_log_payload_has_consistent_shape():
-    payload = _build_request_log_payload(
+    payload = build_request_log_payload(
         request_id="req-1",
         method="POST",
         path="/api/news",

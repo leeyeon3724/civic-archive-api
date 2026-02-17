@@ -4,7 +4,6 @@ from typing import Any
 
 from sqlalchemy import Date, Text, bindparam, cast, column, func, or_, select, table, text
 
-from app.ports.repositories import NewsRepositoryPort
 from app.repositories.common import dedupe_rows_by_key, execute_paginated_query, to_json_recordset
 from app.repositories.session_provider import ConnectionProvider, open_connection_scope
 
@@ -197,7 +196,7 @@ def delete_article(
     return result.rowcount > 0
 
 
-class NewsRepository(NewsRepositoryPort):
+class NewsRepository:
     def __init__(self, *, connection_provider: ConnectionProvider) -> None:
         self._connection_provider = connection_provider
 
