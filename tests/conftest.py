@@ -67,7 +67,10 @@ class StubBeginContext:
 class StubEngine:
     def __init__(self, handler: Optional[Callable[[Any, Optional[Dict[str, Any]]], StubResult]] = None) -> None:
         if handler is None:
-            handler = lambda _statement, _params: StubResult()
+            def _default_handler(_statement, _params):
+                return StubResult()
+
+            handler = _default_handler
         self.connection = StubConnection(handler)
 
     def begin(self) -> StubBeginContext:

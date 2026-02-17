@@ -11,18 +11,11 @@ import sys
 import time
 from datetime import date
 from pathlib import Path
+from typing import Any, Callable
 
 from sqlalchemy import text
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
-
-import app.database as database
-from app.config import Config
-from app.repositories.minutes_repository import list_minutes, upsert_minutes
-from app.repositories.news_repository import list_articles, upsert_articles
-from app.repositories.segments_repository import insert_segments, list_segments
 
 SCENARIO_TAGS: dict[str, list[str]] = {
     "news_list": ["domain:news", "endpoint:/api/news", "operation:list"],
@@ -57,8 +50,40 @@ def percentile(values: list[float], p: float) -> float:
     return float(ordered[k])
 
 
-def _seed_data(rows: int = 300) -> None:
-    with database.engine.begin() as conn:
+def _load_app_dependencies() -> dict[str, Any]:
+    if str(PROJECT_ROOT) not in sys.path:
+        sys.path.insert(0, str(PROJECT_ROOT))
+
+    import app.database as database_module
+    from app.config import Config as config_class
+    from app.repositories.minutes_repository import list_minutes as list_minutes_fn, upsert_minutes as upsert_minutes_fn
+    from app.repositories.news_repository import list_articles as list_articles_fn, upsert_articles as upsert_articles_fn
+    from app.repositories.segments_repository import (
+        insert_segments as insert_segments_fn,
+        list_segments as list_segments_fn,
+    )
+
+    return {
+        "database": database_module,
+        "Config": config_class,
+        "list_articles": list_articles_fn,
+        "upsert_articles": upsert_articles_fn,
+        "list_minutes": list_minutes_fn,
+        "upsert_minutes": upsert_minutes_fn,
+        "list_segments": list_segments_fn,
+        "insert_segments": insert_segments_fn,
+    }
+
+
+def _seed_data(
+    *,
+    database_module,
+    upsert_articles_fn: Callable[[list[dict[str, Any]]], tuple[int, int]],
+    upsert_minutes_fn: Callable[[list[dict[str, Any]]], tuple[int, int]],
+    insert_segments_fn: Callable[[list[dict[str, Any]]], int],
+    rows: int = 300,
+) -> None:
+    with database_module.engine.begin() as conn:
         conn.execute(
             text(
                 """
@@ -123,9 +148,9 @@ def _seed_data(rows: int = 300) -> None:
             }
         )
 
-    upsert_articles(news_items)
-    upsert_minutes(minutes_items)
-    insert_segments(segment_items)
+    upsert_articles_fn(news_items)
+    upsert_minutes_fn(minutes_items)
+    insert_segments_fn(segment_items)
 
 
 def _measure(name: str, fn, runs: int = 25) -> dict[str, float | list[str] | int]:
@@ -226,11 +251,17 @@ def evaluate_thresholds(
     return failures
 
 
-def _collect_results(runs: int) -> dict[str, dict[str, float | list[str] | int]]:
+def _collect_results(
+    *,
+    list_articles_fn,
+    list_minutes_fn,
+    list_segments_fn,
+    runs: int,
+) -> dict[str, dict[str, float | list[str] | int]]:
     return {
         "news_list": _measure(
             "news_list",
-            lambda: list_articles(
+            lambda: list_articles_fn(
                 q="budget",
                 source="bench-source",
                 date_from="2026-02-01",
@@ -242,7 +273,7 @@ def _collect_results(runs: int) -> dict[str, dict[str, float | list[str] | int]]
         ),
         "minutes_list": _measure(
             "minutes_list",
-            lambda: list_minutes(
+            lambda: list_minutes_fn(
                 q="agenda",
                 council="seoul",
                 committee="budget",
@@ -257,7 +288,7 @@ def _collect_results(runs: int) -> dict[str, dict[str, float | list[str] | int]]
         ),
         "segments_list": _measure(
             "segments_list",
-            lambda: list_segments(
+            lambda: list_segments_fn(
                 q="segment",
                 council="seoul",
                 committee="budget",
@@ -279,11 +310,26 @@ def _collect_results(runs: int) -> dict[str, dict[str, float | list[str] | int]]
 
 def main() -> int:
     args = _parse_args()
+    dependencies = _load_app_dependencies()
 
-    config = Config()
-    database.init_db(config.DATABASE_URL)
-    _seed_data(rows=max(50, int(args.seed_rows)))
-    results = _collect_results(runs=max(1, int(args.runs)))
+    database_module = dependencies["database"]
+    config_class = dependencies["Config"]
+
+    config = config_class()
+    database_module.init_db(config.DATABASE_URL)
+    _seed_data(
+        database_module=database_module,
+        upsert_articles_fn=dependencies["upsert_articles"],
+        upsert_minutes_fn=dependencies["upsert_minutes"],
+        insert_segments_fn=dependencies["insert_segments"],
+        rows=max(50, int(args.seed_rows)),
+    )
+    results = _collect_results(
+        list_articles_fn=dependencies["list_articles"],
+        list_minutes_fn=dependencies["list_minutes"],
+        list_segments_fn=dependencies["list_segments"],
+        runs=max(1, int(args.runs)),
+    )
 
     avg_threshold = None
     p95_threshold = None

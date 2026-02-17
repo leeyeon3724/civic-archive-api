@@ -1,4 +1,6 @@
-﻿-r requirements.txt
+-r requirements.txt
 pytest==8.4.1
+pytest-cov==7.0.0
+ruff==0.15.1
 requests>=2.31
 httpx>=0.28
