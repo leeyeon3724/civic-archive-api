@@ -151,6 +151,33 @@ def _build_rate_limiter(config):
     raise RuntimeError("RATE_LIMIT_BACKEND must be one of: memory, redis.")
 
 
+def check_rate_limit_backend_health(config) -> tuple[bool, str | None]:
+    backend = config.rate_limit_backend
+    if backend == "memory":
+        return True, "memory backend"
+
+    if config.RATE_LIMIT_PER_MINUTE <= 0:
+        return True, "rate limit disabled"
+
+    redis_url = (config.REDIS_URL or "").strip()
+    if not redis_url:
+        return False, "REDIS_URL is not set"
+    if redis is None:
+        return False, "redis package is not available"
+
+    try:
+        client = redis.Redis.from_url(
+            redis_url,
+            socket_connect_timeout=0.2,
+            socket_timeout=0.2,
+            decode_responses=False,
+        )
+        client.ping()
+        return True, None
+    except RedisError as exc:
+        return False, str(exc)
+
+
 def build_api_key_dependency(config) -> Callable:
     expected_key = config.API_KEY or ""
     require_api_key = bool(config.REQUIRE_API_KEY)

@@ -3,18 +3,20 @@
 from fastapi import Body, Depends, FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
+from sqlalchemy import text
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
+import app.database as database
 from app.config import Config
 from app.database import init_db
 from app.errors import error_response, normalize_http_exception
 from app.logging_config import configure_logging
 from app.observability import register_observability
 from app.routes import register_routes
-from app.schemas import EchoResponse, ErrorResponse, HealthResponse
-from app.security import build_api_key_dependency, build_rate_limit_dependency
+from app.schemas import EchoResponse, ErrorResponse, HealthResponse, ReadinessCheck, ReadinessResponse
+from app.security import build_api_key_dependency, build_rate_limit_dependency, check_rate_limit_backend_health
 from app.version import APP_VERSION
 
 OPENAPI_TAGS = [
@@ -65,13 +67,48 @@ def create_app(config=None):
     protected_dependencies = [Depends(api_key_dependency), Depends(rate_limit_dependency)]
     register_routes(api, dependencies=protected_dependencies)
 
+    def _db_ready() -> tuple[bool, str | None]:
+        if database.engine is None:
+            return False, "database engine is not initialized"
+        try:
+            with database.engine.begin() as conn:
+                conn.execute(text("SELECT 1"))
+            return True, None
+        except Exception as exc:
+            return False, str(exc)
+
     @api.get("/", tags=["system"])
     async def hello_world():
         return PlainTextResponse("API Server Available")
 
+    @api.get("/health/live", tags=["system"], response_model=HealthResponse, responses={500: {"model": ErrorResponse}})
+    async def health_live():
+        return HealthResponse(status="ok")
+
     @api.get("/health", tags=["system"], response_model=HealthResponse, responses={500: {"model": ErrorResponse}})
     async def health():
-        return HealthResponse(status="ok")
+        return await health_live()
+
+    @api.get(
+        "/health/ready",
+        tags=["system"],
+        response_model=ReadinessResponse,
+        responses={500: {"model": ErrorResponse}, 503: {"model": ReadinessResponse}},
+    )
+    async def health_ready():
+        db_ok, db_detail = _db_ready()
+        rate_limit_ok, rate_limit_detail = check_rate_limit_backend_health(config)
+        checks = {
+            "database": ReadinessCheck(ok=db_ok, detail=db_detail),
+            "rate_limit_backend": ReadinessCheck(ok=rate_limit_ok, detail=rate_limit_detail),
+        }
+        payload = ReadinessResponse(
+            status="ok" if db_ok and rate_limit_ok else "degraded",
+            checks=checks,
+        )
+        if db_ok and rate_limit_ok:
+            return payload
+        return JSONResponse(status_code=503, content=payload.model_dump())
 
     @api.post(
         "/api/echo",

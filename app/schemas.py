@@ -65,6 +65,16 @@ class HealthResponse(BaseModel):
     status: str = Field(examples=["ok"])
 
 
+class ReadinessCheck(BaseModel):
+    ok: bool
+    detail: Optional[str] = None
+
+
+class ReadinessResponse(BaseModel):
+    status: str = Field(examples=["ok", "degraded"])
+    checks: dict[str, ReadinessCheck]
+
+
 class EchoResponse(BaseModel):
     you_sent: Any
 

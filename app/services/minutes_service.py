@@ -13,12 +13,12 @@ from app.utils import bad_request, combine_meeting_no, parse_date
 
 def normalize_minutes(item: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(item, dict):
-        raise bad_request("각 아이템은 JSON 객체여야 합니다.")
+        raise bad_request("Each item must be a JSON object.")
 
     council = item.get("council")
     url = item.get("url")
     if not council or not url:
-        raise bad_request("필수 필드 누락: council, url")
+        raise bad_request("Missing required fields: council, url")
 
     session = item.get("session")
     meeting_no_raw = item.get("meeting_no")
