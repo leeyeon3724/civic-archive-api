@@ -1,12 +1,12 @@
 # syntax=docker/dockerfile:1
 FROM python:3.12-slim
 
-ARG PORT=8000
+ARG APP_PORT=8000
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
-    PORT=${PORT}
+    PORT=${APP_PORT}
 
 WORKDIR /app
 
