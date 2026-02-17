@@ -5,7 +5,7 @@ from typing import Any
 from app.ports.repositories import NewsRepositoryPort
 from app.ports.services import NewsServicePort
 from app.repositories.news_repository import NewsRepository
-from app.repositories.session_provider import ConnectionProvider
+from app.repositories.session_provider import ConnectionProvider, ensure_connection_provider
 from app.utils import bad_request, parse_datetime
 
 
@@ -68,8 +68,8 @@ class NewsService(NewsServicePort):
 
 def build_news_service(
     *,
+    connection_provider: ConnectionProvider,
     repository: NewsRepositoryPort | None = None,
-    connection_provider: ConnectionProvider | None = None,
 ) -> NewsServicePort:
     selected_repository = repository or NewsRepository(connection_provider=connection_provider)
     return NewsService(repository=selected_repository)
@@ -85,7 +85,7 @@ def upsert_articles(
     service: NewsServicePort | None = None,
     connection_provider: ConnectionProvider | None = None,
 ) -> tuple[int, int]:
-    active_service = service or build_news_service(connection_provider=connection_provider)
+    active_service = service or build_news_service(connection_provider=ensure_connection_provider(connection_provider))
     return active_service.upsert_articles(items)
 
 
@@ -100,7 +100,7 @@ def list_articles(
     service: NewsServicePort | None = None,
     connection_provider: ConnectionProvider | None = None,
 ) -> tuple[list[dict[str, Any]], int]:
-    active_service = service or build_news_service(connection_provider=connection_provider)
+    active_service = service or build_news_service(connection_provider=ensure_connection_provider(connection_provider))
     return active_service.list_articles(
         q=q,
         source=source,
@@ -117,7 +117,7 @@ def get_article(
     service: NewsServicePort | None = None,
     connection_provider: ConnectionProvider | None = None,
 ) -> dict[str, Any] | None:
-    active_service = service or build_news_service(connection_provider=connection_provider)
+    active_service = service or build_news_service(connection_provider=ensure_connection_provider(connection_provider))
     return active_service.get_article(item_id)
 
 
@@ -127,5 +127,5 @@ def delete_article(
     service: NewsServicePort | None = None,
     connection_provider: ConnectionProvider | None = None,
 ) -> bool:
-    active_service = service or build_news_service(connection_provider=connection_provider)
+    active_service = service or build_news_service(connection_provider=ensure_connection_provider(connection_provider))
     return active_service.delete_article(item_id)

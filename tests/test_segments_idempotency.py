@@ -24,13 +24,13 @@ def test_normalize_segment_generates_stable_dedupe_hash(segments_module):
     assert first["dedupe_hash"] == second["dedupe_hash"]
 
 
-def test_insert_segments_counts_only_non_conflict_rows(db_module, segments_module, monkeypatch, make_engine):
-    rowcounts = iter([1, 0, 1])
-
+def test_insert_segments_counts_only_non_conflict_rows(segments_module, make_connection_provider):
     def handler(_statement, _params):
-        return StubResult(rowcount=next(rowcounts))
+        return StubResult(rows=[{"inserted": 2}])
 
-    monkeypatch.setattr(db_module, "engine", make_engine(handler))
-
-    inserted = segments_module.insert_segments([{"council": "A"}, {"council": "A"}, {"council": "B"}])
+    connection_provider, _ = make_connection_provider(handler)
+    inserted = segments_module.insert_segments(
+        [{"council": "A"}, {"council": "A"}, {"council": "B"}],
+        connection_provider=connection_provider,
+    )
     assert inserted == 2

@@ -1,109 +1,168 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
-import json
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
-from sqlalchemy import text
+from sqlalchemy import Date, Text, bindparam, cast, column, func, or_, select, table, text
 
 from app.ports.repositories import NewsRepositoryPort
-from app.repositories.common import accumulate_upsert_result, build_where_clause, execute_paginated_query
+from app.repositories.common import dedupe_rows_by_key, execute_paginated_query, to_json_recordset
 from app.repositories.session_provider import ConnectionProvider, open_connection_scope
+
+NEWS_ARTICLES = table(
+    "news_articles",
+    column("id"),
+    column("source"),
+    column("title"),
+    column("url"),
+    column("published_at"),
+    column("author"),
+    column("summary"),
+    column("content"),
+    column("keywords"),
+    column("created_at"),
+    column("updated_at"),
+)
 
 
 def upsert_articles(
-    articles: List[Dict[str, Any]],
+    articles: list[dict[str, Any]],
     *,
-    connection_provider: ConnectionProvider | None = None,
-) -> Tuple[int, int]:
-    inserted = 0
-    updated = 0
+    connection_provider: ConnectionProvider,
+) -> tuple[int, int]:
+    if not articles:
+        return 0, 0
+
+    payload_rows = [
+        {
+            "source": article.get("source"),
+            "title": article.get("title"),
+            "url": article.get("url"),
+            "published_at": article.get("published_at"),
+            "author": article.get("author"),
+            "summary": article.get("summary"),
+            "content": article.get("content"),
+            "keywords": article.get("keywords"),
+        }
+        for article in articles
+    ]
+    payload_rows = dedupe_rows_by_key(payload_rows, key="url")
 
     sql = text(
         """
-        INSERT INTO news_articles
-          (source, title, url, published_at, author, summary, content, keywords)
-        VALUES
-          (:source, :title, :url, :published_at, :author, :summary, :content, CAST(:keywords AS jsonb))
-        ON CONFLICT (url) DO UPDATE SET
-          source = EXCLUDED.source,
-          title = EXCLUDED.title,
-          published_at = EXCLUDED.published_at,
-          author = EXCLUDED.author,
-          summary = EXCLUDED.summary,
-          content = EXCLUDED.content,
-          keywords = EXCLUDED.keywords,
-          updated_at = CURRENT_TIMESTAMP
-        RETURNING (xmax = 0) AS inserted
+        WITH payload AS (
+            SELECT *
+            FROM jsonb_to_recordset(CAST(:items AS jsonb))
+              AS p(
+                source text,
+                title text,
+                url text,
+                published_at timestamptz,
+                author text,
+                summary text,
+                content text,
+                keywords jsonb
+              )
+        ),
+        upserted AS (
+            INSERT INTO news_articles
+              (source, title, url, published_at, author, summary, content, keywords)
+            SELECT
+              source, title, url, published_at, author, summary, content, keywords
+            FROM payload
+            ON CONFLICT (url) DO UPDATE SET
+              source = EXCLUDED.source,
+              title = EXCLUDED.title,
+              published_at = EXCLUDED.published_at,
+              author = EXCLUDED.author,
+              summary = EXCLUDED.summary,
+              content = EXCLUDED.content,
+              keywords = EXCLUDED.keywords,
+              updated_at = CURRENT_TIMESTAMP
+            RETURNING (xmax = 0) AS inserted
+        )
+        SELECT
+          COALESCE(SUM(CASE WHEN inserted THEN 1 ELSE 0 END), 0) AS inserted,
+          COALESCE(SUM(CASE WHEN NOT inserted THEN 1 ELSE 0 END), 0) AS updated
+        FROM upserted
         """
     )
 
     with open_connection_scope(connection_provider) as conn:
-        for article in articles:
-            params = {
-                "source": article.get("source"),
-                "title": article.get("title"),
-                "url": article.get("url"),
-                "published_at": article.get("published_at"),
-                "author": article.get("author"),
-                "summary": article.get("summary"),
-                "content": article.get("content"),
-                "keywords": json.dumps(article.get("keywords")) if article.get("keywords") is not None else None,
-            }
-            result = conn.execute(sql, params)
-            inserted, updated = accumulate_upsert_result(result, inserted=inserted, updated=updated)
+        row = conn.execute(sql, {"items": to_json_recordset(payload_rows)}).mappings().first() or {}
 
-    return inserted, updated
+    return int(row.get("inserted") or 0), int(row.get("updated") or 0)
 
 
 def list_articles(
     *,
-    q: Optional[str],
-    source: Optional[str],
-    date_from: Optional[str],
-    date_to: Optional[str],
+    q: str | None,
+    source: str | None,
+    date_from: str | None,
+    date_to: str | None,
     page: int,
     size: int,
-    connection_provider: ConnectionProvider | None = None,
-) -> Tuple[List[Dict[str, Any]], int]:
-    where = []
-    params: Dict[str, Any] = {}
+    connection_provider: ConnectionProvider,
+) -> tuple[list[dict[str, Any]], int]:
+    conditions = []
+    params: dict[str, Any] = {}
 
     if q:
-        where.append("(title ILIKE :q OR summary ILIKE :q OR content ILIKE :q)")
+        q_bind: Any = bindparam("q")
+        conditions.append(
+            or_(
+                cast(NEWS_ARTICLES.c.title, Text).ilike(q_bind),
+                cast(NEWS_ARTICLES.c.summary, Text).ilike(q_bind),
+                cast(NEWS_ARTICLES.c.content, Text).ilike(q_bind),
+            )
+        )
         params["q"] = f"%{q}%"
 
     if source:
-        where.append("source = :source")
+        conditions.append(NEWS_ARTICLES.c.source == bindparam("source"))
         params["source"] = source
 
     if date_from:
-        where.append("published_at >= :date_from")
+        conditions.append(NEWS_ARTICLES.c.published_at >= bindparam("date_from"))
         params["date_from"] = date_from
 
     if date_to:
-        where.append("published_at < (CAST(:date_to AS date) + INTERVAL '1 day')")
+        conditions.append(
+            NEWS_ARTICLES.c.published_at
+            < (cast(bindparam("date_to"), Date) + text("INTERVAL '1 day'"))
+        )
         params["date_to"] = date_to
 
-    where_sql = build_where_clause(where)
+    list_stmt = (
+        select(
+            NEWS_ARTICLES.c.id,
+            NEWS_ARTICLES.c.source,
+            NEWS_ARTICLES.c.title,
+            NEWS_ARTICLES.c.url,
+            NEWS_ARTICLES.c.published_at,
+            NEWS_ARTICLES.c.author,
+            NEWS_ARTICLES.c.summary,
+            NEWS_ARTICLES.c.keywords,
+            NEWS_ARTICLES.c.created_at,
+            NEWS_ARTICLES.c.updated_at,
+        )
+        .order_by(
+            func.coalesce(NEWS_ARTICLES.c.published_at, NEWS_ARTICLES.c.created_at).desc(),
+            NEWS_ARTICLES.c.id.desc(),
+        )
+        .limit(bindparam("limit"))
+        .offset(bindparam("offset"))
+    )
 
-    list_sql = f"""
-        SELECT
-            id, source, title, url, published_at, author, summary, keywords, created_at, updated_at
-        FROM news_articles
-        {where_sql}
-        ORDER BY COALESCE(published_at, created_at) DESC, id DESC
-        LIMIT :limit OFFSET :offset
-        """
+    count_stmt = select(func.count().label("total")).select_from(NEWS_ARTICLES)
 
-    count_sql = f"""
-        SELECT COUNT(*) AS total
-        FROM news_articles
-        {where_sql}
-        """
+    if conditions:
+        for condition in conditions:
+            list_stmt = list_stmt.where(condition)
+            count_stmt = count_stmt.where(condition)
 
     return execute_paginated_query(
-        list_sql=list_sql,
-        count_sql=count_sql,
+        list_stmt=list_stmt,
+        count_stmt=count_stmt,
         params=params,
         page=page,
         size=size,
@@ -114,8 +173,8 @@ def list_articles(
 def get_article(
     item_id: int,
     *,
-    connection_provider: ConnectionProvider | None = None,
-) -> Optional[Dict[str, Any]]:
+    connection_provider: ConnectionProvider,
+) -> dict[str, Any] | None:
     sql = text(
         "SELECT id, source, title, url, published_at, author, summary, content, keywords, created_at, updated_at "
         "FROM news_articles WHERE id=:id"
@@ -130,7 +189,7 @@ def get_article(
 def delete_article(
     item_id: int,
     *,
-    connection_provider: ConnectionProvider | None = None,
+    connection_provider: ConnectionProvider,
 ) -> bool:
     with open_connection_scope(connection_provider) as conn:
         result = conn.execute(text("DELETE FROM news_articles WHERE id=:id"), {"id": item_id})
@@ -139,22 +198,22 @@ def delete_article(
 
 
 class NewsRepository(NewsRepositoryPort):
-    def __init__(self, *, connection_provider: ConnectionProvider | None = None) -> None:
+    def __init__(self, *, connection_provider: ConnectionProvider) -> None:
         self._connection_provider = connection_provider
 
-    def upsert_articles(self, articles: List[Dict[str, Any]]) -> Tuple[int, int]:
+    def upsert_articles(self, articles: list[dict[str, Any]]) -> tuple[int, int]:
         return upsert_articles(articles, connection_provider=self._connection_provider)
 
     def list_articles(
         self,
         *,
-        q: Optional[str],
-        source: Optional[str],
-        date_from: Optional[str],
-        date_to: Optional[str],
+        q: str | None,
+        source: str | None,
+        date_from: str | None,
+        date_to: str | None,
         page: int,
         size: int,
-    ) -> Tuple[List[Dict[str, Any]], int]:
+    ) -> tuple[list[dict[str, Any]], int]:
         return list_articles(
             q=q,
             source=source,
@@ -165,7 +224,7 @@ class NewsRepository(NewsRepositoryPort):
             connection_provider=self._connection_provider,
         )
 
-    def get_article(self, item_id: int) -> Optional[Dict[str, Any]]:
+    def get_article(self, item_id: int) -> dict[str, Any] | None:
         return get_article(item_id, connection_provider=self._connection_provider)
 
     def delete_article(self, item_id: int) -> bool:

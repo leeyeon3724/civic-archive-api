@@ -43,7 +43,7 @@ app/
 │   ├── minutes_service.py
 │   └── segments_service.py
 ├── repositories/        # SQL 실행/조회 레이어 (PostgreSQL 쿼리)
-│   ├── session_provider.py # DB 연결 scope provider (DI 준비 단계)
+│   ├── session_provider.py # DB 연결 scope provider 계약 (필수 provider 검증/오픈)
 │   ├── news_repository.py
 │   ├── minutes_repository.py
 │   └── segments_repository.py
@@ -63,7 +63,7 @@ scripts/
 ├── benchmark_queries.py # 대표 조회 쿼리 성능 회귀 체크
 ├── check_commit_messages.py # 커밋 메시지 정책 검사 (Conventional Commits + scope)
 ├── check_docs_routes.py # API.md 라우트 계약 + README 링크 검사
-├── check_mypy.py        # mypy phase-1 타입체크 래퍼 (warn/fail 모드)
+├── check_mypy.py        # mypy phase-2 타입체크 래퍼 (blocking 기본)
 ├── check_schema_policy.py # 런타임 수동 DDL 금지 정책 검사
 ├── check_slo_policy.py  # SLO 정책 문서 기준선 검사
 ├── check_runtime_health.py # 배포 전 liveness/readiness 가드 검사
@@ -96,11 +96,11 @@ tests/
 ```text
 create_app()
   -> Config() 로드
-  -> app.state.connection_provider 설정 (요청 스코프 서비스 DI 기본 provider)
   -> validate_startup_config()             # 환경/보안/운영 가드 검증
   -> register_core_middleware()            # CORS/TrustedHost + request_size_guard
   -> configure_logging()                # JSON 로그 포맷
   -> init_db(DATABASE_URL + pool/timeout runtime tuning)
+  -> app.state.db_engine / app.state.connection_provider 설정
   -> API 보호 의존성(api-key/rate-limit) 구성
   -> register_observability()           # X-Request-Id + metrics + request logging
   -> register_domain_routes(...)        # APIRouter 등록
@@ -121,6 +121,7 @@ ASGI 엔트리포인트: `app.main:app`
 ## 주요 설계 결정
 
 - PostgreSQL upsert: `ON CONFLICT ... DO UPDATE`
+- 배치 ingest 최적화: `jsonb_to_recordset` 기반 단일 SQL 실행(뉴스/회의록 upsert, 세그먼트 insert)
 - 검색: 텍스트 `ILIKE`, JSONB 컬럼은 `CAST(... AS TEXT) ILIKE`로 통합 검색
 - 목록 total: `COUNT(*)` 별도 쿼리
 - 요청/응답 검증: FastAPI + Pydantic 모델 기반으로 OpenAPI 자동 문서화
@@ -133,10 +134,10 @@ ASGI 엔트리포인트: `app.main:app`
 - 운영 strict 모드: `SECURITY_STRICT_MODE=1` 또는 `APP_ENV=production`에서 인증/호스트/CORS/rate-limit 가드 강제
 - DB 런타임 튜닝: `DB_POOL_SIZE`, `DB_MAX_OVERFLOW`, `DB_POOL_TIMEOUT_SECONDS`, `DB_CONNECT_TIMEOUT_SECONDS`, `DB_STATEMENT_TIMEOUT_MS`
 - ingest 안전 가드: `INGEST_MAX_BATCH_ITEMS`, `MAX_REQUEST_BODY_BYTES` 기반으로 oversized 요청을 `413`으로 차단
-- DB DI 준비: `app/repositories/session_provider.py`로 connection scope 추상화, repository는 선택적 `connection_provider` 주입 지원
+- DB DI 최종화: 앱 상태(`app.state.connection_provider`)에서 repository까지 명시적 주입, 전역 엔진 상태 의존 제거
 - 서비스 DI: `app/services/providers.py`에서 request 단위 `get_*_service` provider를 통해 route 계층에 주입
 - 포트 분리: `app/ports/services.py`, `app/ports/repositories.py`에 Protocol 인터페이스를 모아 계층 결합도 축소
-- 타입체크 phase-1: `mypy.ini` + `scripts/check_mypy.py` (기본 warn, 이후 fail 승격 준비)
+- 타입체크 phase-2: `mypy.ini` + `scripts/check_mypy.py` (services/ports/repositories/observability 범위 blocking)
 - 성능 회귀 체크: `scripts/benchmark_queries.py` + avg/p95 threshold 검사
 - 성능 임계값 프로파일: `docs/PERFORMANCE.md` + `scripts/benchmark_queries.py --profile <dev|staging|prod>`
 - 문서-코드 정합성: `scripts/check_docs_routes.py` + CI

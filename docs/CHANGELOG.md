@@ -36,6 +36,8 @@
 - service/repository 포트 인터페이스 모듈 추가 (`app/ports/services.py`, `app/ports/repositories.py`)
 - 타입체크 스크립트/설정 추가 (`scripts/check_mypy.py`, `mypy.ini`)
 - JWT leeway 설정 추가 (`JWT_LEEWAY_SECONDS`)
+- E2E 실서버 검증 워크플로우 추가 (`.github/workflows/e2e-live.yml`, Docker Compose 기반)
+- 정적 보안 스캔 도구 추가 (`bandit`)
 
 ### 변경됨
 
@@ -69,6 +71,16 @@
 - 서비스/리포지토리 Port Protocol 정의를 서비스 구현 파일에서 분리해 `app/ports/*`로 이동
 - CI 문서 계약 워크플로우에 phase-1 mypy 체크(경고 모드) 단계를 추가
 - JWT 검증을 수동 구현에서 `PyJWT` 기반 검증으로 전환하고 `sub`/`exp` 필수 정책을 적용
+- DB 접근 경로를 앱 상태 기반 `connection_provider` 주입으로 일원화하고 전역 `database.engine` 의존을 제거
+- 뉴스/회의록/세그먼트 배치 쓰기를 JSON recordset 기반 단일 SQL 실행으로 최적화해 row-by-row 루프를 제거
+- E2E 테스트에 `E2E_REQUIRE_TARGET=1` 강제 모드를 추가해 CI에서 skip 대신 실패로 검증 신뢰성을 강화
+- 배치 upsert 입력에서 동일 `url` 중복을 사전 dedupe(마지막 항목 우선)해 단일 배치 충돌 리스크를 제거
+- observability 미들웨어의 상태코드 판별/로그 payload/메트릭 관측 로직을 순수 함수로 분리
+- `check_runtime_health.py` HTTP 호출을 `requests` 기반으로 정리하고 URL scheme 제한을 추가
+- mypy 기본 실행 모드를 `fail`로 승격하고 검사 범위를 `repositories`/`observability`까지 확장
+- CI 문서 계약 워크플로우의 mypy 단계를 phase-2 blocking 모드로 승격
+- repository list 쿼리(news/minutes/segments)를 SQLAlchemy 표현식 기반 빌더로 전환해 동적 SQL 문자열 조합을 제거
+- 공급망 보안 워크플로우 Bandit 실행에서 `B608` 임시 제외를 제거하고 전체 규칙을 활성화
 
 ### 수정됨
 

@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from typing import Any, Dict, Tuple
-
-from sqlalchemy import text
+import json
+from datetime import date, datetime
+from typing import Any
 
 from app.repositories.session_provider import ConnectionProvider, open_connection_scope
 
 
-def accumulate_upsert_result(result, *, inserted: int, updated: int) -> Tuple[int, int]:
+def accumulate_upsert_result(result, *, inserted: int, updated: int) -> tuple[int, int]:
     inserted_flag = None
 
     scalar = getattr(result, "scalar", None)
@@ -30,24 +30,44 @@ def accumulate_upsert_result(result, *, inserted: int, updated: int) -> Tuple[in
     return inserted, updated
 
 
-def build_where_clause(where: list[str]) -> str:
-    return (" WHERE " + " AND ".join(where)) if where else ""
+def _json_default(value: Any) -> Any:
+    if isinstance(value, (datetime, date)):
+        return value.isoformat()
+    raise TypeError(f"Object of type {type(value).__name__} is not JSON serializable")
+
+
+def to_json_recordset(items: list[dict[str, Any]]) -> str:
+    return json.dumps(items, ensure_ascii=False, default=_json_default, separators=(",", ":"))
+
+
+def dedupe_rows_by_key(items: list[dict[str, Any]], *, key: str) -> list[dict[str, Any]]:
+    """Keep the last row per key while preserving relative order of retained rows."""
+    seen: set[Any] = set()
+    deduped_reversed: list[dict[str, Any]] = []
+    for item in reversed(items):
+        key_value = item.get(key)
+        if key_value in seen:
+            continue
+        seen.add(key_value)
+        deduped_reversed.append(item)
+    deduped_reversed.reverse()
+    return deduped_reversed
 
 
 def execute_paginated_query(
     *,
-    list_sql: str,
-    count_sql: str,
-    params: Dict[str, Any],
+    list_stmt: Any,
+    count_stmt: Any,
+    params: dict[str, Any],
     page: int,
     size: int,
-    connection_provider: ConnectionProvider | None = None,
-) -> Tuple[list[dict[str, Any]], int]:
+    connection_provider: ConnectionProvider,
+) -> tuple[list[dict[str, Any]], int]:
     with open_connection_scope(connection_provider) as conn:
         rows = conn.execute(
-            text(list_sql),
+            list_stmt,
             {**params, "limit": size, "offset": (page - 1) * size},
         ).mappings().all()
-        total = conn.execute(text(count_sql), params).scalar() or 0
+        total = conn.execute(count_stmt, params).scalar() or 0
 
     return [dict(row) for row in rows], int(total)

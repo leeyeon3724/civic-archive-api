@@ -54,8 +54,8 @@ def _load_app_dependencies() -> dict[str, Any]:
     if str(PROJECT_ROOT) not in sys.path:
         sys.path.insert(0, str(PROJECT_ROOT))
 
-    import app.database as database_module
     from app.config import Config as config_class
+    from app.database import init_db as init_db_fn
     from app.repositories.minutes_repository import list_minutes as list_minutes_fn, upsert_minutes as upsert_minutes_fn
     from app.repositories.news_repository import list_articles as list_articles_fn, upsert_articles as upsert_articles_fn
     from app.repositories.segments_repository import (
@@ -64,7 +64,7 @@ def _load_app_dependencies() -> dict[str, Any]:
     )
 
     return {
-        "database": database_module,
+        "init_db": init_db_fn,
         "Config": config_class,
         "list_articles": list_articles_fn,
         "upsert_articles": upsert_articles_fn,
@@ -77,13 +77,13 @@ def _load_app_dependencies() -> dict[str, Any]:
 
 def _seed_data(
     *,
-    database_module,
-    upsert_articles_fn: Callable[[list[dict[str, Any]]], tuple[int, int]],
-    upsert_minutes_fn: Callable[[list[dict[str, Any]]], tuple[int, int]],
-    insert_segments_fn: Callable[[list[dict[str, Any]]], int],
+    connection_provider: Callable[[], Any],
+    upsert_articles_fn: Callable[..., tuple[int, int]],
+    upsert_minutes_fn: Callable[..., tuple[int, int]],
+    insert_segments_fn: Callable[..., int],
     rows: int = 300,
 ) -> None:
-    with database_module.engine.begin() as conn:
+    with connection_provider() as conn:
         conn.execute(
             text(
                 """
@@ -148,9 +148,9 @@ def _seed_data(
             }
         )
 
-    upsert_articles_fn(news_items)
-    upsert_minutes_fn(minutes_items)
-    insert_segments_fn(segment_items)
+    upsert_articles_fn(news_items, connection_provider=connection_provider)
+    upsert_minutes_fn(minutes_items, connection_provider=connection_provider)
+    insert_segments_fn(segment_items, connection_provider=connection_provider)
 
 
 def _measure(name: str, fn, runs: int = 25) -> dict[str, float | list[str] | int]:
@@ -256,6 +256,7 @@ def _collect_results(
     list_articles_fn,
     list_minutes_fn,
     list_segments_fn,
+    connection_provider: Callable[[], Any],
     runs: int,
 ) -> dict[str, dict[str, float | list[str] | int]]:
     return {
@@ -268,6 +269,7 @@ def _collect_results(
                 date_to="2026-02-28",
                 page=1,
                 size=20,
+                connection_provider=connection_provider,
             ),
             runs=runs,
         ),
@@ -283,6 +285,7 @@ def _collect_results(
                 date_to="2026-02-28",
                 page=1,
                 size=20,
+                connection_provider=connection_provider,
             ),
             runs=runs,
         ),
@@ -302,6 +305,7 @@ def _collect_results(
                 date_to="2026-02-28",
                 page=1,
                 size=20,
+                connection_provider=connection_provider,
             ),
             runs=runs,
         ),
@@ -312,13 +316,14 @@ def main() -> int:
     args = _parse_args()
     dependencies = _load_app_dependencies()
 
-    database_module = dependencies["database"]
     config_class = dependencies["Config"]
+    init_db_fn = dependencies["init_db"]
 
     config = config_class()
-    database_module.init_db(config.DATABASE_URL)
+    db_engine = init_db_fn(config.DATABASE_URL)
+    connection_provider = db_engine.begin
     _seed_data(
-        database_module=database_module,
+        connection_provider=connection_provider,
         upsert_articles_fn=dependencies["upsert_articles"],
         upsert_minutes_fn=dependencies["upsert_minutes"],
         insert_segments_fn=dependencies["insert_segments"],
@@ -328,6 +333,7 @@ def main() -> int:
         list_articles_fn=dependencies["list_articles"],
         list_minutes_fn=dependencies["list_minutes"],
         list_segments_fn=dependencies["list_segments"],
+        connection_provider=connection_provider,
         runs=max(1, int(args.runs)),
     )
 

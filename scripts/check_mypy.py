@@ -13,8 +13,10 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_TARGETS = [
     "app/config.py",
     "app/security.py",
+    "app/observability.py",
     "app/services",
     "app/ports",
+    "app/repositories",
     "scripts/check_commit_messages.py",
     "scripts/check_docs_routes.py",
     "scripts/check_mypy.py",
@@ -30,7 +32,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--mode",
         choices=("fail", "warn"),
-        default=(str(os.environ.get("MYPY_MODE", "warn")).strip().lower() or "warn"),
+        default=(str(os.environ.get("MYPY_MODE", "fail")).strip().lower() or "fail"),
         help="Validation mode. fail=exit 1 on mypy errors, warn=print warnings only.",
     )
     parser.add_argument(

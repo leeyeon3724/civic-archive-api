@@ -131,6 +131,9 @@ python -m alembic downgrade -1
 # 린트 검사
 python -m ruff check app tests scripts
 
+# 타입 검사 (phase-2, blocking)
+python scripts/check_mypy.py
+
 # unit/contract 테스트 + 커버리지 하한
 python -m pytest -q -m "not e2e and not integration" --cov=app --cov-report=term --cov-fail-under=85
 
@@ -166,6 +169,16 @@ RUN_INTEGRATION=1 python -m pytest -m integration
 
 # 배포 전 런타임 헬스 가드
 python scripts/check_runtime_health.py --base-url http://localhost:8000
+```
+
+## E2E 테스트 (라이브 서버)
+
+```bash
+# 로컬/수동 실행: 대상 서버 미도달 시 skip
+python -m pytest -q -m e2e --base-url http://localhost:8000
+
+# CI/강제 실행: 대상 서버 미도달 시 fail
+E2E_REQUIRE_TARGET=1 python -m pytest -q -m e2e --base-url http://localhost:8000
 ```
 
 ## 성능 회귀 체크

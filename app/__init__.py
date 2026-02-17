@@ -1,6 +1,7 @@
 import logging
 
 from fastapi import Depends, FastAPI
+from sqlalchemy import text
 
 from app.bootstrap import (
     register_core_middleware,
@@ -13,7 +14,6 @@ from app.config import Config
 from app.database import init_db
 from app.logging_config import configure_logging
 from app.observability import register_observability
-from app.repositories.session_provider import get_connection_provider
 from app.security import (
     build_api_key_dependency,
     build_jwt_dependency,
@@ -45,12 +45,11 @@ def create_app(config=None):
         openapi_tags=OPENAPI_TAGS,
     )
     api.state.config = config
-    api.state.connection_provider = lambda: get_connection_provider()()
 
     validate_startup_config(config)
     register_core_middleware(api, config)
 
-    init_db(
+    db_engine = init_db(
         config.DATABASE_URL,
         pool_size=config.DB_POOL_SIZE,
         max_overflow=config.DB_MAX_OVERFLOW,
@@ -59,6 +58,9 @@ def create_app(config=None):
         connect_timeout_seconds=config.DB_CONNECT_TIMEOUT_SECONDS,
         statement_timeout_ms=config.DB_STATEMENT_TIMEOUT_MS,
     )
+    api.state.db_engine = db_engine
+    api.state.connection_provider = db_engine.begin
+
     register_observability(api)
 
     api_key_dependency = build_api_key_dependency(config)
@@ -66,11 +68,20 @@ def create_app(config=None):
     rate_limit_dependency = build_rate_limit_dependency(config)
     protected_dependencies = [Depends(api_key_dependency), Depends(jwt_dependency), Depends(rate_limit_dependency)]
 
+    def db_health_check() -> tuple[bool, str | None]:
+        try:
+            with api.state.connection_provider() as conn:
+                conn.execute(text("SELECT 1"))
+            return True, None
+        except Exception as exc:
+            return False, str(exc)
+
     register_domain_routes(api, protected_dependencies=protected_dependencies)
     register_system_routes(
         api,
         config=config,
         protected_dependencies=protected_dependencies,
+        db_health_check=db_health_check,
         rate_limit_health_check=lambda: check_rate_limit_backend_health(config),
     )
     register_exception_handlers(api, logger=logger)

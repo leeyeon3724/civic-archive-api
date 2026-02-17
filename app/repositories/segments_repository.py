@@ -1,159 +1,253 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
-import json
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
-from sqlalchemy import text
+from sqlalchemy import Text, bindparam, cast, column, func, or_, select, table, text
 
 from app.ports.repositories import SegmentsRepositoryPort
-from app.repositories.common import build_where_clause, execute_paginated_query
+from app.repositories.common import execute_paginated_query, to_json_recordset
 from app.repositories.session_provider import ConnectionProvider, open_connection_scope
+
+COUNCIL_SPEECH_SEGMENTS = table(
+    "council_speech_segments",
+    column("id"),
+    column("council"),
+    column("committee"),
+    column("session"),
+    column("meeting_no"),
+    column("meeting_no_combined"),
+    column("meeting_date"),
+    column("content"),
+    column("summary"),
+    column("subject"),
+    column("tag"),
+    column("importance"),
+    column("moderator"),
+    column("questioner"),
+    column("answerer"),
+    column("party"),
+    column("constituency"),
+    column("department"),
+    column("dedupe_hash"),
+    column("created_at"),
+    column("updated_at"),
+)
 
 
 def insert_segments(
-    items: List[Dict[str, Any]],
+    items: list[dict[str, Any]],
     *,
-    connection_provider: ConnectionProvider | None = None,
+    connection_provider: ConnectionProvider,
 ) -> int:
+    if not items:
+        return 0
+
+    payload_rows = [
+        {
+            "council": segment.get("council"),
+            "committee": segment.get("committee"),
+            "session": segment.get("session"),
+            "meeting_no": segment.get("meeting_no"),
+            "meeting_no_combined": segment.get("meeting_no_combined"),
+            "meeting_date": segment.get("meeting_date"),
+            "content": segment.get("content"),
+            "summary": segment.get("summary"),
+            "subject": segment.get("subject"),
+            "tag": segment.get("tag"),
+            "importance": segment.get("importance"),
+            "moderator": segment.get("moderator"),
+            "questioner": segment.get("questioner"),
+            "answerer": segment.get("answerer"),
+            "party": segment.get("party"),
+            "constituency": segment.get("constituency"),
+            "department": segment.get("department"),
+            "dedupe_hash": segment.get("dedupe_hash"),
+        }
+        for segment in items
+    ]
+
     sql = text(
         """
-        INSERT INTO council_speech_segments
-          (council, committee, "session", meeting_no, meeting_no_combined, meeting_date,
-           content, summary, subject, tag, importance, moderator, questioner, answerer,
-           party, constituency, department, dedupe_hash)
-        VALUES
-          (:council, :committee, :session, :meeting_no, :meeting_no_combined, :meeting_date,
-           :content, :summary, :subject, CAST(:tag AS jsonb), :importance,
-           CAST(:moderator AS jsonb), CAST(:questioner AS jsonb), CAST(:answerer AS jsonb),
-           :party, :constituency, :department, :dedupe_hash)
-        ON CONFLICT (dedupe_hash) DO NOTHING
+        WITH payload AS (
+            SELECT *
+            FROM jsonb_to_recordset(CAST(:items AS jsonb))
+              AS p(
+                council text,
+                committee text,
+                session text,
+                meeting_no integer,
+                meeting_no_combined text,
+                meeting_date date,
+                content text,
+                summary text,
+                subject text,
+                tag jsonb,
+                importance integer,
+                moderator jsonb,
+                questioner jsonb,
+                answerer jsonb,
+                party text,
+                constituency text,
+                department text,
+                dedupe_hash text
+              )
+        ),
+        inserted_rows AS (
+            INSERT INTO council_speech_segments
+              (council, committee, "session", meeting_no, meeting_no_combined, meeting_date,
+               content, summary, subject, tag, importance, moderator, questioner, answerer,
+               party, constituency, department, dedupe_hash)
+            SELECT
+              council,
+              committee,
+              session,
+              meeting_no,
+              meeting_no_combined,
+              meeting_date,
+              content,
+              summary,
+              subject,
+              tag,
+              importance,
+              moderator,
+              questioner,
+              answerer,
+              party,
+              constituency,
+              department,
+              dedupe_hash
+            FROM payload
+            ON CONFLICT (dedupe_hash) DO NOTHING
+            RETURNING 1
+        )
+        SELECT COUNT(*) AS inserted
+        FROM inserted_rows
         """
     )
 
-    inserted = 0
     with open_connection_scope(connection_provider) as conn:
-        for segment in items:
-            params = {
-                "council": segment.get("council"),
-                "committee": segment.get("committee"),
-                "session": segment.get("session"),
-                "meeting_no": segment.get("meeting_no"),
-                "meeting_no_combined": segment.get("meeting_no_combined"),
-                "meeting_date": segment.get("meeting_date"),
-                "content": segment.get("content"),
-                "summary": segment.get("summary"),
-                "subject": segment.get("subject"),
-                "tag": json.dumps(segment.get("tag")) if segment.get("tag") is not None else None,
-                "importance": segment.get("importance"),
-                "moderator": json.dumps(segment.get("moderator")) if segment.get("moderator") is not None else None,
-                "questioner": json.dumps(segment.get("questioner")) if segment.get("questioner") is not None else None,
-                "answerer": json.dumps(segment.get("answerer")) if segment.get("answerer") is not None else None,
-                "party": segment.get("party"),
-                "constituency": segment.get("constituency"),
-                "department": segment.get("department"),
-                "dedupe_hash": segment.get("dedupe_hash"),
-            }
-            result = conn.execute(sql, params)
-            inserted += max(0, int(result.rowcount or 0))
+        row = conn.execute(sql, {"items": to_json_recordset(payload_rows)}).mappings().first() or {}
 
-    return inserted
+    return int(row.get("inserted") or 0)
 
 
 def list_segments(
     *,
-    q: Optional[str],
-    council: Optional[str],
-    committee: Optional[str],
-    session: Optional[str],
-    meeting_no: Optional[str],
-    importance: Optional[int],
-    party: Optional[str],
-    constituency: Optional[str],
-    department: Optional[str],
-    date_from: Optional[str],
-    date_to: Optional[str],
+    q: str | None,
+    council: str | None,
+    committee: str | None,
+    session: str | None,
+    meeting_no: str | None,
+    importance: int | None,
+    party: str | None,
+    constituency: str | None,
+    department: str | None,
+    date_from: str | None,
+    date_to: str | None,
     page: int,
     size: int,
-    connection_provider: ConnectionProvider | None = None,
-) -> Tuple[List[Dict[str, Any]], int]:
-    where = []
-    params: Dict[str, Any] = {}
+    connection_provider: ConnectionProvider,
+) -> tuple[list[dict[str, Any]], int]:
+    conditions = []
+    params: dict[str, Any] = {}
 
     if q:
-        where.append(
-            "(" 
-            "council ILIKE :q OR committee ILIKE :q OR \"session\" ILIKE :q "
-            "OR content ILIKE :q OR summary ILIKE :q OR subject ILIKE :q "
-            "OR party ILIKE :q OR constituency ILIKE :q OR department ILIKE :q "
-            "OR CAST(tag AS TEXT) ILIKE :q "
-            "OR CAST(questioner AS TEXT) ILIKE :q "
-            "OR CAST(answerer AS TEXT) ILIKE :q"
-            ")"
+        q_bind: Any = bindparam("q")
+        conditions.append(
+            or_(
+                cast(COUNCIL_SPEECH_SEGMENTS.c.council, Text).ilike(q_bind),
+                cast(COUNCIL_SPEECH_SEGMENTS.c.committee, Text).ilike(q_bind),
+                cast(COUNCIL_SPEECH_SEGMENTS.c["session"], Text).ilike(q_bind),
+                cast(COUNCIL_SPEECH_SEGMENTS.c.content, Text).ilike(q_bind),
+                cast(COUNCIL_SPEECH_SEGMENTS.c.summary, Text).ilike(q_bind),
+                cast(COUNCIL_SPEECH_SEGMENTS.c.subject, Text).ilike(q_bind),
+                cast(COUNCIL_SPEECH_SEGMENTS.c.party, Text).ilike(q_bind),
+                cast(COUNCIL_SPEECH_SEGMENTS.c.constituency, Text).ilike(q_bind),
+                cast(COUNCIL_SPEECH_SEGMENTS.c.department, Text).ilike(q_bind),
+                cast(COUNCIL_SPEECH_SEGMENTS.c.tag, Text).ilike(q_bind),
+                cast(COUNCIL_SPEECH_SEGMENTS.c.questioner, Text).ilike(q_bind),
+                cast(COUNCIL_SPEECH_SEGMENTS.c.answerer, Text).ilike(q_bind),
+            )
         )
         params["q"] = f"%{q}%"
 
     if council:
-        where.append("council = :council")
+        conditions.append(COUNCIL_SPEECH_SEGMENTS.c.council == bindparam("council"))
         params["council"] = council
 
     if committee:
-        where.append("committee = :committee")
+        conditions.append(COUNCIL_SPEECH_SEGMENTS.c.committee == bindparam("committee"))
         params["committee"] = committee
 
     if session:
-        where.append('"session" = :session')
+        conditions.append(COUNCIL_SPEECH_SEGMENTS.c["session"] == bindparam("session"))
         params["session"] = session
 
     if meeting_no:
-        where.append("meeting_no_combined = :meeting_no")
+        conditions.append(COUNCIL_SPEECH_SEGMENTS.c.meeting_no_combined == bindparam("meeting_no"))
         params["meeting_no"] = meeting_no
 
     if importance is not None:
-        where.append("importance = :importance")
+        conditions.append(COUNCIL_SPEECH_SEGMENTS.c.importance == bindparam("importance"))
         params["importance"] = importance
 
     if party:
-        where.append("party = :party")
+        conditions.append(COUNCIL_SPEECH_SEGMENTS.c.party == bindparam("party"))
         params["party"] = party
 
     if constituency:
-        where.append("constituency = :constituency")
+        conditions.append(COUNCIL_SPEECH_SEGMENTS.c.constituency == bindparam("constituency"))
         params["constituency"] = constituency
 
     if department:
-        where.append("department = :department")
+        conditions.append(COUNCIL_SPEECH_SEGMENTS.c.department == bindparam("department"))
         params["department"] = department
 
     if date_from:
-        where.append("meeting_date >= :date_from")
+        conditions.append(COUNCIL_SPEECH_SEGMENTS.c.meeting_date >= bindparam("date_from"))
         params["date_from"] = date_from
 
     if date_to:
-        where.append("meeting_date <= :date_to")
+        conditions.append(COUNCIL_SPEECH_SEGMENTS.c.meeting_date <= bindparam("date_to"))
         params["date_to"] = date_to
 
-    where_sql = build_where_clause(where)
+    list_stmt = (
+        select(
+            COUNCIL_SPEECH_SEGMENTS.c.id,
+            COUNCIL_SPEECH_SEGMENTS.c.council,
+            COUNCIL_SPEECH_SEGMENTS.c.committee,
+            COUNCIL_SPEECH_SEGMENTS.c["session"],
+            COUNCIL_SPEECH_SEGMENTS.c.meeting_no_combined.label("meeting_no"),
+            COUNCIL_SPEECH_SEGMENTS.c.meeting_date,
+            COUNCIL_SPEECH_SEGMENTS.c.summary,
+            COUNCIL_SPEECH_SEGMENTS.c.subject,
+            COUNCIL_SPEECH_SEGMENTS.c.tag,
+            COUNCIL_SPEECH_SEGMENTS.c.importance,
+            COUNCIL_SPEECH_SEGMENTS.c.moderator,
+            COUNCIL_SPEECH_SEGMENTS.c.questioner,
+            COUNCIL_SPEECH_SEGMENTS.c.answerer,
+            COUNCIL_SPEECH_SEGMENTS.c.party,
+            COUNCIL_SPEECH_SEGMENTS.c.constituency,
+            COUNCIL_SPEECH_SEGMENTS.c.department,
+        )
+        .order_by(
+            func.coalesce(COUNCIL_SPEECH_SEGMENTS.c.meeting_date, COUNCIL_SPEECH_SEGMENTS.c.created_at).desc(),
+            COUNCIL_SPEECH_SEGMENTS.c.id.desc(),
+        )
+        .limit(bindparam("limit"))
+        .offset(bindparam("offset"))
+    )
 
-    list_sql = f"""
-        SELECT
-            id, council, committee, "session", meeting_no_combined AS meeting_no, meeting_date,
-            summary, subject, tag, importance, moderator, questioner, answerer,
-            party, constituency, department
-        FROM council_speech_segments
-        {where_sql}
-        ORDER BY COALESCE(meeting_date, created_at) DESC, id DESC
-        LIMIT :limit OFFSET :offset
-        """
+    count_stmt = select(func.count().label("total")).select_from(COUNCIL_SPEECH_SEGMENTS)
 
-    count_sql = f"""
-        SELECT COUNT(*) AS total
-        FROM council_speech_segments
-        {where_sql}
-        """
+    if conditions:
+        for condition in conditions:
+            list_stmt = list_stmt.where(condition)
+            count_stmt = count_stmt.where(condition)
 
     return execute_paginated_query(
-        list_sql=list_sql,
-        count_sql=count_sql,
+        list_stmt=list_stmt,
+        count_stmt=count_stmt,
         params=params,
         page=page,
         size=size,
@@ -164,8 +258,8 @@ def list_segments(
 def get_segment(
     item_id: int,
     *,
-    connection_provider: ConnectionProvider | None = None,
-) -> Optional[Dict[str, Any]]:
+    connection_provider: ConnectionProvider,
+) -> dict[str, Any] | None:
     sql = text(
         """
         SELECT id, council, committee, "session",
@@ -188,7 +282,7 @@ def get_segment(
 def delete_segment(
     item_id: int,
     *,
-    connection_provider: ConnectionProvider | None = None,
+    connection_provider: ConnectionProvider,
 ) -> bool:
     with open_connection_scope(connection_provider) as conn:
         result = conn.execute(text("DELETE FROM council_speech_segments WHERE id=:id"), {"id": item_id})
@@ -197,29 +291,29 @@ def delete_segment(
 
 
 class SegmentsRepository(SegmentsRepositoryPort):
-    def __init__(self, *, connection_provider: ConnectionProvider | None = None) -> None:
+    def __init__(self, *, connection_provider: ConnectionProvider) -> None:
         self._connection_provider = connection_provider
 
-    def insert_segments(self, items: List[Dict[str, Any]]) -> int:
+    def insert_segments(self, items: list[dict[str, Any]]) -> int:
         return insert_segments(items, connection_provider=self._connection_provider)
 
     def list_segments(
         self,
         *,
-        q: Optional[str],
-        council: Optional[str],
-        committee: Optional[str],
-        session: Optional[str],
-        meeting_no: Optional[str],
-        importance: Optional[int],
-        party: Optional[str],
-        constituency: Optional[str],
-        department: Optional[str],
-        date_from: Optional[str],
-        date_to: Optional[str],
+        q: str | None,
+        council: str | None,
+        committee: str | None,
+        session: str | None,
+        meeting_no: str | None,
+        importance: int | None,
+        party: str | None,
+        constituency: str | None,
+        department: str | None,
+        date_from: str | None,
+        date_to: str | None,
         page: int,
         size: int,
-    ) -> Tuple[List[Dict[str, Any]], int]:
+    ) -> tuple[list[dict[str, Any]], int]:
         return list_segments(
             q=q,
             council=council,
@@ -237,7 +331,7 @@ class SegmentsRepository(SegmentsRepositoryPort):
             connection_provider=self._connection_provider,
         )
 
-    def get_segment(self, item_id: int) -> Optional[Dict[str, Any]]:
+    def get_segment(self, item_id: int) -> dict[str, Any] | None:
         return get_segment(item_id, connection_provider=self._connection_provider)
 
     def delete_segment(self, item_id: int) -> bool:

@@ -17,13 +17,13 @@ def test_health_ready_endpoint(client):
     assert payload["checks"]["rate_limit_backend"]["ok"] is True
 
 
-def test_health_ready_returns_503_when_any_check_fails(client, monkeypatch, db_module, make_engine):
+def test_health_ready_returns_503_when_any_check_fails(client, monkeypatch, use_stub_connection_provider):
     app_module = importlib.import_module("app")
 
     def failing_db_handler(_statement, _params):
         raise RuntimeError("db unavailable")
 
-    monkeypatch.setattr(db_module, "engine", make_engine(failing_db_handler))
+    use_stub_connection_provider(failing_db_handler)
     monkeypatch.setattr(app_module, "check_rate_limit_backend_health", lambda _config: (False, "redis down"))
 
     resp = client.get("/health/ready")

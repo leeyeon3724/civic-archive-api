@@ -1,138 +1,206 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
-import json
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
-from sqlalchemy import text
+from sqlalchemy import Text, bindparam, cast, column, func, or_, select, table, text
 
 from app.ports.repositories import MinutesRepositoryPort
-from app.repositories.common import accumulate_upsert_result, build_where_clause, execute_paginated_query
+from app.repositories.common import dedupe_rows_by_key, execute_paginated_query, to_json_recordset
 from app.repositories.session_provider import ConnectionProvider, open_connection_scope
+
+COUNCIL_MINUTES = table(
+    "council_minutes",
+    column("id"),
+    column("council"),
+    column("committee"),
+    column("session"),
+    column("meeting_no"),
+    column("meeting_no_combined"),
+    column("url"),
+    column("meeting_date"),
+    column("content"),
+    column("tag"),
+    column("attendee"),
+    column("agenda"),
+    column("created_at"),
+    column("updated_at"),
+)
 
 
 def upsert_minutes(
-    items: List[Dict[str, Any]],
+    items: list[dict[str, Any]],
     *,
-    connection_provider: ConnectionProvider | None = None,
-) -> Tuple[int, int]:
-    inserted = 0
-    updated = 0
+    connection_provider: ConnectionProvider,
+) -> tuple[int, int]:
+    if not items:
+        return 0, 0
+
+    payload_rows = [
+        {
+            "council": minute.get("council"),
+            "committee": minute.get("committee"),
+            "session": minute.get("session"),
+            "meeting_no": minute.get("meeting_no"),
+            "meeting_no_combined": minute.get("meeting_no_combined"),
+            "url": minute.get("url"),
+            "meeting_date": minute.get("meeting_date"),
+            "content": minute.get("content"),
+            "tag": minute.get("tag"),
+            "attendee": minute.get("attendee"),
+            "agenda": minute.get("agenda"),
+        }
+        for minute in items
+    ]
+    payload_rows = dedupe_rows_by_key(payload_rows, key="url")
 
     sql = text(
         """
-        INSERT INTO council_minutes
-          (council, committee, "session", meeting_no, meeting_no_combined, url, meeting_date, content, tag, attendee, agenda)
-        VALUES
-          (:council, :committee, :session, :meeting_no, :meeting_no_combined, :url, :meeting_date, :content,
-           CAST(:tag AS jsonb), CAST(:attendee AS jsonb), CAST(:agenda AS jsonb))
-        ON CONFLICT (url) DO UPDATE SET
-          council = EXCLUDED.council,
-          committee = EXCLUDED.committee,
-          "session" = EXCLUDED."session",
-          meeting_no = EXCLUDED.meeting_no,
-          meeting_no_combined = EXCLUDED.meeting_no_combined,
-          meeting_date = EXCLUDED.meeting_date,
-          content = EXCLUDED.content,
-          tag = EXCLUDED.tag,
-          attendee = EXCLUDED.attendee,
-          agenda = EXCLUDED.agenda,
-          updated_at = CURRENT_TIMESTAMP
-        RETURNING (xmax = 0) AS inserted
+        WITH payload AS (
+            SELECT *
+            FROM jsonb_to_recordset(CAST(:items AS jsonb))
+              AS p(
+                council text,
+                committee text,
+                session text,
+                meeting_no integer,
+                meeting_no_combined text,
+                url text,
+                meeting_date date,
+                content text,
+                tag jsonb,
+                attendee jsonb,
+                agenda jsonb
+              )
+        ),
+        upserted AS (
+            INSERT INTO council_minutes
+              (council, committee, "session", meeting_no, meeting_no_combined, url, meeting_date, content, tag, attendee, agenda)
+            SELECT
+              council,
+              committee,
+              session,
+              meeting_no,
+              meeting_no_combined,
+              url,
+              meeting_date,
+              content,
+              tag,
+              attendee,
+              agenda
+            FROM payload
+            ON CONFLICT (url) DO UPDATE SET
+              council = EXCLUDED.council,
+              committee = EXCLUDED.committee,
+              "session" = EXCLUDED."session",
+              meeting_no = EXCLUDED.meeting_no,
+              meeting_no_combined = EXCLUDED.meeting_no_combined,
+              meeting_date = EXCLUDED.meeting_date,
+              content = EXCLUDED.content,
+              tag = EXCLUDED.tag,
+              attendee = EXCLUDED.attendee,
+              agenda = EXCLUDED.agenda,
+              updated_at = CURRENT_TIMESTAMP
+            RETURNING (xmax = 0) AS inserted
+        )
+        SELECT
+          COALESCE(SUM(CASE WHEN inserted THEN 1 ELSE 0 END), 0) AS inserted,
+          COALESCE(SUM(CASE WHEN NOT inserted THEN 1 ELSE 0 END), 0) AS updated
+        FROM upserted
         """
     )
 
     with open_connection_scope(connection_provider) as conn:
-        for minute in items:
-            params = {
-                "council": minute.get("council"),
-                "committee": minute.get("committee"),
-                "session": minute.get("session"),
-                "meeting_no": minute.get("meeting_no"),
-                "meeting_no_combined": minute.get("meeting_no_combined"),
-                "url": minute.get("url"),
-                "meeting_date": minute.get("meeting_date"),
-                "content": minute.get("content"),
-                "tag": json.dumps(minute.get("tag")) if minute.get("tag") is not None else None,
-                "attendee": json.dumps(minute.get("attendee")) if minute.get("attendee") is not None else None,
-                "agenda": json.dumps(minute.get("agenda")) if minute.get("agenda") is not None else None,
-            }
-            result = conn.execute(sql, params)
-            inserted, updated = accumulate_upsert_result(result, inserted=inserted, updated=updated)
+        row = conn.execute(sql, {"items": to_json_recordset(payload_rows)}).mappings().first() or {}
 
-    return inserted, updated
+    return int(row.get("inserted") or 0), int(row.get("updated") or 0)
 
 
 def list_minutes(
     *,
-    q: Optional[str],
-    council: Optional[str],
-    committee: Optional[str],
-    session: Optional[str],
-    meeting_no: Optional[str],
-    date_from: Optional[str],
-    date_to: Optional[str],
+    q: str | None,
+    council: str | None,
+    committee: str | None,
+    session: str | None,
+    meeting_no: str | None,
+    date_from: str | None,
+    date_to: str | None,
     page: int,
     size: int,
-    connection_provider: ConnectionProvider | None = None,
-) -> Tuple[List[Dict[str, Any]], int]:
-    where = []
-    params: Dict[str, Any] = {}
+    connection_provider: ConnectionProvider,
+) -> tuple[list[dict[str, Any]], int]:
+    conditions = []
+    params: dict[str, Any] = {}
 
     if q:
-        where.append(
-            "(" 
-            "council ILIKE :q OR committee ILIKE :q OR \"session\" ILIKE :q "
-            "OR content ILIKE :q OR CAST(agenda AS TEXT) ILIKE :q"
-            ")"
+        q_bind: Any = bindparam("q")
+        conditions.append(
+            or_(
+                cast(COUNCIL_MINUTES.c.council, Text).ilike(q_bind),
+                cast(COUNCIL_MINUTES.c.committee, Text).ilike(q_bind),
+                cast(COUNCIL_MINUTES.c["session"], Text).ilike(q_bind),
+                cast(COUNCIL_MINUTES.c.content, Text).ilike(q_bind),
+                cast(COUNCIL_MINUTES.c.agenda, Text).ilike(q_bind),
+            )
         )
         params["q"] = f"%{q}%"
 
     if council:
-        where.append("council = :council")
+        conditions.append(COUNCIL_MINUTES.c.council == bindparam("council"))
         params["council"] = council
 
     if committee:
-        where.append("committee = :committee")
+        conditions.append(COUNCIL_MINUTES.c.committee == bindparam("committee"))
         params["committee"] = committee
 
     if session:
-        where.append('"session" = :session')
+        conditions.append(COUNCIL_MINUTES.c["session"] == bindparam("session"))
         params["session"] = session
 
     if meeting_no:
-        where.append("meeting_no_combined = :meeting_no")
+        conditions.append(COUNCIL_MINUTES.c.meeting_no_combined == bindparam("meeting_no"))
         params["meeting_no"] = meeting_no
 
     if date_from:
-        where.append("meeting_date >= :date_from")
+        conditions.append(COUNCIL_MINUTES.c.meeting_date >= bindparam("date_from"))
         params["date_from"] = date_from
 
     if date_to:
-        where.append("meeting_date <= :date_to")
+        conditions.append(COUNCIL_MINUTES.c.meeting_date <= bindparam("date_to"))
         params["date_to"] = date_to
 
-    where_sql = build_where_clause(where)
+    list_stmt = (
+        select(
+            COUNCIL_MINUTES.c.id,
+            COUNCIL_MINUTES.c.council,
+            COUNCIL_MINUTES.c.committee,
+            COUNCIL_MINUTES.c["session"],
+            COUNCIL_MINUTES.c.meeting_no_combined.label("meeting_no"),
+            COUNCIL_MINUTES.c.url,
+            COUNCIL_MINUTES.c.meeting_date,
+            COUNCIL_MINUTES.c.tag,
+            COUNCIL_MINUTES.c.attendee,
+            COUNCIL_MINUTES.c.agenda,
+            COUNCIL_MINUTES.c.created_at,
+            COUNCIL_MINUTES.c.updated_at,
+        )
+        .order_by(
+            func.coalesce(COUNCIL_MINUTES.c.meeting_date, COUNCIL_MINUTES.c.created_at).desc(),
+            COUNCIL_MINUTES.c.id.desc(),
+        )
+        .limit(bindparam("limit"))
+        .offset(bindparam("offset"))
+    )
 
-    list_sql = f"""
-        SELECT
-            id, council, committee, "session",
-            meeting_no_combined AS meeting_no,
-            url, meeting_date, tag, attendee, agenda, created_at, updated_at
-        FROM council_minutes
-        {where_sql}
-        ORDER BY COALESCE(meeting_date, created_at) DESC, id DESC
-        LIMIT :limit OFFSET :offset
-        """
+    count_stmt = select(func.count().label("total")).select_from(COUNCIL_MINUTES)
 
-    count_sql = f"""
-        SELECT COUNT(*) AS total
-        FROM council_minutes
-        {where_sql}
-        """
+    if conditions:
+        for condition in conditions:
+            list_stmt = list_stmt.where(condition)
+            count_stmt = count_stmt.where(condition)
 
     return execute_paginated_query(
-        list_sql=list_sql,
-        count_sql=count_sql,
+        list_stmt=list_stmt,
+        count_stmt=count_stmt,
         params=params,
         page=page,
         size=size,
@@ -143,8 +211,8 @@ def list_minutes(
 def get_minutes(
     item_id: int,
     *,
-    connection_provider: ConnectionProvider | None = None,
-) -> Optional[Dict[str, Any]]:
+    connection_provider: ConnectionProvider,
+) -> dict[str, Any] | None:
     sql = text(
         """
         SELECT id, council, committee, "session", meeting_no_combined AS meeting_no,
@@ -163,7 +231,7 @@ def get_minutes(
 def delete_minutes(
     item_id: int,
     *,
-    connection_provider: ConnectionProvider | None = None,
+    connection_provider: ConnectionProvider,
 ) -> bool:
     with open_connection_scope(connection_provider) as conn:
         result = conn.execute(text("DELETE FROM council_minutes WHERE id=:id"), {"id": item_id})
@@ -172,25 +240,25 @@ def delete_minutes(
 
 
 class MinutesRepository(MinutesRepositoryPort):
-    def __init__(self, *, connection_provider: ConnectionProvider | None = None) -> None:
+    def __init__(self, *, connection_provider: ConnectionProvider) -> None:
         self._connection_provider = connection_provider
 
-    def upsert_minutes(self, items: List[Dict[str, Any]]) -> Tuple[int, int]:
+    def upsert_minutes(self, items: list[dict[str, Any]]) -> tuple[int, int]:
         return upsert_minutes(items, connection_provider=self._connection_provider)
 
     def list_minutes(
         self,
         *,
-        q: Optional[str],
-        council: Optional[str],
-        committee: Optional[str],
-        session: Optional[str],
-        meeting_no: Optional[str],
-        date_from: Optional[str],
-        date_to: Optional[str],
+        q: str | None,
+        council: str | None,
+        committee: str | None,
+        session: str | None,
+        meeting_no: str | None,
+        date_from: str | None,
+        date_to: str | None,
         page: int,
         size: int,
-    ) -> Tuple[List[Dict[str, Any]], int]:
+    ) -> tuple[list[dict[str, Any]], int]:
         return list_minutes(
             q=q,
             council=council,
@@ -204,7 +272,7 @@ class MinutesRepository(MinutesRepositoryPort):
             connection_provider=self._connection_provider,
         )
 
-    def get_minutes(self, item_id: int) -> Optional[Dict[str, Any]]:
+    def get_minutes(self, item_id: int) -> dict[str, Any] | None:
         return get_minutes(item_id, connection_provider=self._connection_provider)
 
     def delete_minutes(self, item_id: int) -> bool:

@@ -63,7 +63,7 @@ PR 본문에 아래 항목을 포함합니다.
 
 - `python scripts/check_commit_messages.py --rev-range origin/main..HEAD --mode fail`
 - `python -m ruff check app tests scripts`
-- `python scripts/check_mypy.py --mode warn` (phase-1, non-blocking baseline)
+- `python scripts/check_mypy.py` (phase-2, blocking scope: `services/ports/repositories/observability`)
 - `python -m pytest -q -m "not e2e and not integration" --cov=app --cov-report=term --cov-fail-under=85`
 - `python scripts/check_docs_routes.py`
 - `python scripts/check_schema_policy.py`
@@ -85,6 +85,7 @@ PR 본문에 아래 항목을 포함합니다.
   - 처리량/성능 가드 변경 시 oversized payload(`413 PAYLOAD_TOO_LARGE`) 동작 확인 결과 첨부
 - 보안/공급망 변경 PR
   - `pip-audit -r requirements.txt -r requirements-dev.txt`
+  - `bandit -q -r app scripts -ll`
   - 필요 시 SBOM 갱신/첨부 (`cyclonedx-py requirements ...`)
 - 운영/가용성 변경 PR
   - `python scripts/check_runtime_health.py --base-url <target>`

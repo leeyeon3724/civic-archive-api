@@ -191,3 +191,28 @@ def make_engine():
         return StubEngine(handler=handler)
 
     return _factory
+
+
+@pytest.fixture
+def make_connection_provider(make_engine):
+    def _factory(handler: Callable[[Any, Optional[Dict[str, Any]]], StubResult]):
+        engine = make_engine(handler)
+        return engine.begin, engine
+
+    return _factory
+
+
+@pytest.fixture
+def use_stub_connection_provider(app_instance, make_engine):
+    original_provider = app_instance.state.connection_provider
+    original_engine = getattr(app_instance.state, "db_engine", None)
+
+    def _use(handler: Callable[[Any, Optional[Dict[str, Any]]], StubResult]) -> StubEngine:
+        engine = make_engine(handler)
+        app_instance.state.connection_provider = engine.begin
+        app_instance.state.db_engine = engine
+        return engine
+
+    yield _use
+    app_instance.state.connection_provider = original_provider
+    app_instance.state.db_engine = original_engine

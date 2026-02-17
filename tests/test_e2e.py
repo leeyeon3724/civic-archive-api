@@ -7,6 +7,7 @@ Run examples:
 from __future__ import annotations
 
 import json
+import os
 import uuid
 from typing import Any
 
@@ -41,10 +42,13 @@ class APIClient:
 @pytest.fixture(scope="module", autouse=True)
 def ensure_e2e_target_reachable(request) -> None:
     base_url = request.config.getoption("--base-url").rstrip("/")
+    require_target = os.getenv("E2E_REQUIRE_TARGET") == "1"
     probe_url = f"{base_url}/health"
     try:
         requests.get(probe_url, timeout=3)
     except requests.RequestException as exc:
+        if require_target:
+            pytest.fail(f"E2E target is unreachable: {probe_url} ({exc.__class__.__name__})")
         pytest.skip(f"E2E target is unreachable: {probe_url} ({exc.__class__.__name__})")
 
 

@@ -2,10 +2,8 @@ from __future__ import annotations
 
 from fastapi import Body, FastAPI, Request
 from fastapi.responses import JSONResponse, PlainTextResponse
-from sqlalchemy import text
 
-import app.database as database
-from app.bootstrap.contracts import ProtectedDependencies, RateLimitHealthCheck
+from app.bootstrap.contracts import DBHealthCheck, ProtectedDependencies, RateLimitHealthCheck
 from app.schemas import EchoResponse, ErrorResponse, HealthResponse, ReadinessCheck, ReadinessResponse
 
 
@@ -14,18 +12,9 @@ def register_system_routes(
     *,
     config,
     protected_dependencies: ProtectedDependencies,
+    db_health_check: DBHealthCheck,
     rate_limit_health_check: RateLimitHealthCheck,
 ) -> None:
-    def _db_ready() -> tuple[bool, str | None]:
-        if database.engine is None:
-            return False, "database engine is not initialized"
-        try:
-            with database.engine.begin() as conn:
-                conn.execute(text("SELECT 1"))
-            return True, None
-        except Exception as exc:
-            return False, str(exc)
-
     @api.get("/", tags=["system"])
     async def hello_world():
         return PlainTextResponse("API Server Available")
@@ -45,7 +34,7 @@ def register_system_routes(
         responses={500: {"model": ErrorResponse}, 503: {"model": ReadinessResponse}},
     )
     async def health_ready():
-        db_ok, db_detail = _db_ready()
+        db_ok, db_detail = db_health_check()
         rate_limit_ok, rate_limit_detail = rate_limit_health_check()
         checks = {
             "database": ReadinessCheck(ok=db_ok, detail=db_detail),

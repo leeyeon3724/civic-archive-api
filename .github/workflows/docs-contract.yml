@@ -45,8 +45,8 @@ jobs:
       - name: Run lint checks
         run: python -m ruff check app tests scripts
 
-      - name: Run type checks (phase-1, non-blocking)
-        run: python scripts/check_mypy.py --mode warn
+      - name: Run type checks (phase-2, blocking)
+        run: python scripts/check_mypy.py
 
       - name: Run unit/contract tests with coverage gate
         run: python -m pytest -q -m "not e2e and not integration" --cov=app --cov-report=term --cov-fail-under=85
