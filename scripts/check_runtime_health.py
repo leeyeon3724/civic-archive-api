@@ -6,31 +6,26 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-import urllib.error
-import urllib.request
+from urllib.parse import urlparse
+
+import requests
 
 
 def _http_get_json(url: str, timeout: float) -> tuple[int, dict | str]:
-    req = urllib.request.Request(url, method="GET")
+    parsed = urlparse(url)
+    if parsed.scheme not in {"http", "https"}:
+        return 0, f"unsupported URL scheme: {parsed.scheme}"
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            status = int(resp.status)
-            body_raw = resp.read().decode("utf-8", errors="replace")
-            try:
-                body = json.loads(body_raw) if body_raw else {}
-            except Exception:
-                body = body_raw
-            return status, body
-    except urllib.error.HTTPError as exc:
-        status = int(exc.code)
-        body_raw = exc.read().decode("utf-8", errors="replace")
+        response = requests.get(url, timeout=timeout)
+        status = int(response.status_code)
+        body_raw = response.text
         try:
             body = json.loads(body_raw) if body_raw else {}
         except Exception:
             body = body_raw
         return status, body
-    except urllib.error.URLError as exc:
-        return 0, f"connection error: {exc.reason}"
+    except requests.RequestException as exc:
+        return 0, f"connection error: {exc}"
 
 
 def main() -> int:
