@@ -81,6 +81,8 @@
 - CI 문서 계약 워크플로우의 mypy 단계를 phase-2 blocking 모드로 승격
 - repository list 쿼리(news/minutes/segments)를 SQLAlchemy 표현식 기반 빌더로 전환해 동적 SQL 문자열 조합을 제거
 - 공급망 보안 워크플로우 Bandit 실행에서 `B608` 임시 제외를 제거하고 전체 규칙을 활성화
+- 테스트 부트스트랩에 test config factory를 도입해 `.env` 영향 없이 결정적으로 앱 설정을 주입하도록 정리
+- 리팩토링 로드맵 실행 티켓(P0/P1/P2)을 `docs/REFACTOR_BACKLOG.md`에 우선순위/완료조건/리스크 형식으로 추가
 
 ### 수정됨
 

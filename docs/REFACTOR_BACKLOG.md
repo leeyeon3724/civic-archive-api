@@ -328,3 +328,83 @@
 - [x] Add dedicated exception-path focused observability unit tests
 - [x] Promote mypy gate to phase-2 blocking mode (scope: `services/ports/repositories/observability`)
 - [x] Refactor repository list query builders to SQLAlchemy expressions and remove Bandit `B608` temporary skip
+
+## P9 Execution Tickets (Roadmap Refresh)
+
+### Ticket P0-1: Test Determinism Baseline
+
+- Priority: P0
+- Status: Completed
+- Tasks:
+  - [x] add test-only config factory that disables `.env` loading and pins deterministic defaults
+  - [x] migrate test bootstrap paths from direct `Config()` construction to test config factory
+  - [x] add regression test proving environment variables do not silently change test runtime config
+- Done Criteria:
+  - [x] all `tests/*.py` app bootstrap paths use test config factory (no direct `Config()` in tests)
+  - [x] `pytest -m "not e2e and not integration"` passes with coverage gate
+  - [x] mypy/ruff gates pass
+- Risks:
+  - integration test operators may rely on implicit environment-based DB overrides
+  - fixture bootstrap change can reveal hidden test coupling
+
+### Ticket P1-1: Type Gate Expansion to Bootstrap/Routes
+
+- Priority: P1
+- Status: Planned
+- Tasks:
+  - remove `mypy.ini` ignore blocks for `app.__init__`, `app.bootstrap.*`, `app.routes.*` in phases
+  - annotate `app.state` access and dependency contracts to reduce `Any` leakage
+  - add/adjust typing tests for startup and route wiring paths
+- Done Criteria:
+  - mypy blocking scope includes app bootstrap and route modules
+  - no `ignore_errors = True` remains for bootstrap/routes
+  - CI docs-contract workflow remains green
+- Risks:
+  - short-term PR velocity drop while annotations are introduced
+  - additional refactor may be needed in FastAPI dependency signatures
+
+### Ticket P1-2: Security Module Decomposition
+
+- Priority: P1
+- Status: Planned
+- Tasks:
+  - split `app/security.py` into jwt/rate-limit/proxy/dependency modules
+  - keep public behavior and config surface backward compatible
+  - add module-level focused unit tests
+- Done Criteria:
+  - security responsibilities are separated into focused modules
+  - existing security regression tests pass without behavior drift
+  - architecture docs updated
+- Risks:
+  - accidental behavior drift in auth/rate-limit edge cases
+  - import cycle risk while extracting shared helpers
+
+### Ticket P2-1: Test Resilience Against SQL Rendering Changes
+
+- Priority: P2
+- Status: Planned
+- Tasks:
+  - reduce SQL string rendering assertions in tests
+  - shift to behavior-focused assertions (params, row mapping, pagination offsets, call counts)
+  - keep minimal SQL shape assertions only where contractually necessary
+- Done Criteria:
+  - repository/service tests do not depend on exact SQL text rendering
+  - query builder refactors no longer trigger broad test rewrites
+- Risks:
+  - too-loose assertions can weaken regression detection if not balanced
+
+### Ticket P2-2: Parsing/Domain Contract Unification
+
+- Priority: P2
+- Status: Planned
+- Tasks:
+  - unify duplicated date/datetime parsing policy across `schemas` and `utils`
+  - introduce typed DTO boundaries for service/repository ports incrementally
+  - align error messages and validation semantics across layers
+- Done Criteria:
+  - single parsing policy implementation is reused across layers
+  - `dict[str, Any]` boundary usage is reduced in ports/services
+  - compatibility tests pass for existing API contracts
+- Risks:
+  - API-facing validation messages may change unexpectedly
+  - phased migration complexity across routes/services/repositories
