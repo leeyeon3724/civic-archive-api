@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+import base64
+import hashlib
 import hmac
+import json
 import logging
 import threading
 import time
+from ipaddress import ip_address, ip_network
 from typing import Callable
 
 from fastapi import Header, Request
@@ -109,6 +113,7 @@ return current
             return True
         if self._client is None:
             return True
+
         now = self._monotonic()
         if now < self._degraded_until:
             return self.fail_open
@@ -143,13 +148,164 @@ return current
             return int(self._client.eval(self._WINDOW_SCRIPT, 1, redis_key, self.window_seconds))
 
 
-def _client_key(request: Request) -> str:
-    forwarded_for = request.headers.get("X-Forwarded-For")
-    if forwarded_for:
-        first_hop = forwarded_for.split(",")[0].strip()
-        if first_hop:
-            return first_hop
+def _base64url_decode(value: str) -> bytes:
+    padding = "=" * ((4 - len(value) % 4) % 4)
+    return base64.urlsafe_b64decode((value + padding).encode("ascii"))
+
+
+def _json_from_b64url(value: str) -> dict:
+    decoded = _base64url_decode(value)
+    payload = json.loads(decoded.decode("utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError("jwt payload is not an object")
+    return payload
+
+
+def _extract_values_set(claims: dict, *keys: str) -> set[str]:
+    values: set[str] = set()
+    for key in keys:
+        raw = claims.get(key)
+        if isinstance(raw, str):
+            if key == "scope":
+                values.update(token for token in raw.split() if token)
+            elif raw.strip():
+                values.add(raw.strip())
+        elif isinstance(raw, list):
+            for item in raw:
+                if isinstance(item, str) and item.strip():
+                    values.add(item.strip())
+    return values
+
+
+def _required_scope_for_method(config, method: str) -> str | None:
+    normalized = (method or "").upper()
+    if normalized in {"GET", "HEAD"}:
+        return (config.JWT_SCOPE_READ or "").strip() or None
+    if normalized in {"POST", "PUT", "PATCH"}:
+        return (config.JWT_SCOPE_WRITE or "").strip() or None
+    if normalized == "DELETE":
+        return (config.JWT_SCOPE_DELETE or "").strip() or None
+    return None
+
+
+def _validate_jwt_hs256(token: str, config) -> dict:
+    parts = token.split(".")
+    if len(parts) != 3:
+        raise http_error(401, "UNAUTHORIZED", "Unauthorized")
+
+    header_b64, payload_b64, signature_b64 = parts
+    try:
+        header = _json_from_b64url(header_b64)
+        payload = _json_from_b64url(payload_b64)
+        signature = _base64url_decode(signature_b64)
+    except Exception:
+        raise http_error(401, "UNAUTHORIZED", "Unauthorized")
+
+    if str(header.get("alg") or "").upper() != "HS256":
+        raise http_error(401, "UNAUTHORIZED", "Unauthorized")
+
+    secret = (config.JWT_SECRET or "").encode("utf-8")
+    signing_input = f"{header_b64}.{payload_b64}".encode("ascii")
+    expected_signature = hmac.new(secret, signing_input, hashlib.sha256).digest()
+    if not hmac.compare_digest(expected_signature, signature):
+        raise http_error(401, "UNAUTHORIZED", "Unauthorized")
+
+    now = int(time.time())
+
+    exp = payload.get("exp")
+    if exp is not None:
+        try:
+            if now >= int(exp):
+                raise http_error(401, "UNAUTHORIZED", "Unauthorized")
+        except (TypeError, ValueError):
+            raise http_error(401, "UNAUTHORIZED", "Unauthorized")
+
+    nbf = payload.get("nbf")
+    if nbf is not None:
+        try:
+            if now < int(nbf):
+                raise http_error(401, "UNAUTHORIZED", "Unauthorized")
+        except (TypeError, ValueError):
+            raise http_error(401, "UNAUTHORIZED", "Unauthorized")
+
+    audience = (config.JWT_AUDIENCE or "").strip()
+    if audience:
+        aud_claim = payload.get("aud")
+        if isinstance(aud_claim, str):
+            aud_values = {aud_claim}
+        elif isinstance(aud_claim, list):
+            aud_values = {str(v) for v in aud_claim}
+        else:
+            aud_values = set()
+        if audience not in aud_values:
+            raise http_error(401, "UNAUTHORIZED", "Unauthorized")
+
+    issuer = (config.JWT_ISSUER or "").strip()
+    if issuer and str(payload.get("iss") or "") != issuer:
+        raise http_error(401, "UNAUTHORIZED", "Unauthorized")
+
+    return payload
+
+
+def _authorize_claims_for_request(request: Request, claims: dict, config) -> None:
+    required_scope = _required_scope_for_method(config, request.method)
+    if not required_scope:
+        return
+
+    admin_role = (config.JWT_ADMIN_ROLE or "").strip()
+    role_values = _extract_values_set(claims, "role", "roles")
+    if admin_role and admin_role in role_values:
+        return
+
+    scope_values = _extract_values_set(claims, "scope", "scopes")
+    if required_scope not in scope_values:
+        raise http_error(403, "FORBIDDEN", "Forbidden")
+
+
+def _parse_trusted_proxy_networks(cidrs: list[str]) -> list:
+    networks = []
+    for raw in cidrs:
+        value = (raw or "").strip()
+        if not value:
+            continue
+        try:
+            networks.append(ip_network(value, strict=False))
+        except ValueError as exc:
+            raise RuntimeError(f"Invalid TRUSTED_PROXY_CIDRS entry: {value}") from exc
+    return networks
+
+
+def _remote_ip(request: Request) -> str:
     return request.client.host if request.client else "unknown"
+
+
+def _is_trusted_proxy(remote_ip: str, trusted_proxy_networks: list) -> bool:
+    if not trusted_proxy_networks:
+        return False
+    try:
+        remote_addr = ip_address(remote_ip)
+    except ValueError:
+        return False
+    return any(remote_addr in network for network in trusted_proxy_networks)
+
+
+def _client_key(request: Request, *, trusted_proxy_networks: list) -> str:
+    remote_ip = _remote_ip(request)
+    if not _is_trusted_proxy(remote_ip, trusted_proxy_networks):
+        return remote_ip
+
+    forwarded_for = request.headers.get("X-Forwarded-For")
+    if not forwarded_for:
+        return remote_ip
+
+    first_hop = forwarded_for.split(",")[0].strip()
+    if not first_hop:
+        return remote_ip
+    try:
+        ip_address(first_hop)
+        return first_hop
+    except ValueError:
+        return remote_ip
 
 
 def _build_rate_limiter(config):
@@ -210,13 +366,38 @@ def build_api_key_dependency(config) -> Callable:
     return verify_api_key
 
 
+def build_jwt_dependency(config) -> Callable:
+    require_jwt = bool(config.REQUIRE_JWT)
+
+    async def verify_jwt(
+        request: Request,
+        authorization: str | None = Header(default=None, alias="Authorization"),
+    ) -> None:
+        if not require_jwt:
+            return
+
+        if not authorization:
+            raise http_error(401, "UNAUTHORIZED", "Unauthorized")
+        scheme, _, value = authorization.partition(" ")
+        token = value.strip()
+        if scheme.lower() != "bearer" or not token:
+            raise http_error(401, "UNAUTHORIZED", "Unauthorized")
+
+        claims = _validate_jwt_hs256(token, config)
+        _authorize_claims_for_request(request, claims, config)
+        request.state.auth_claims = claims
+
+    return verify_jwt
+
+
 def build_rate_limit_dependency(config) -> Callable:
     limiter = _build_rate_limiter(config)
+    trusted_proxy_networks = _parse_trusted_proxy_networks(config.trusted_proxy_cidrs_list)
 
     async def verify_rate_limit(request: Request) -> None:
         if not limiter.enabled:
             return
-        if not limiter.allow(_client_key(request)):
+        if not limiter.allow(_client_key(request, trusted_proxy_networks=trusted_proxy_networks)):
             raise http_error(429, "RATE_LIMITED", "Too Many Requests")
 
     return verify_rate_limit

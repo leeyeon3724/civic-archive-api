@@ -27,6 +27,15 @@ class Config(BaseSettings):
     LOG_JSON: bool = True
     REQUIRE_API_KEY: bool = False
     API_KEY: str | None = None
+    REQUIRE_JWT: bool = False
+    JWT_SECRET: str | None = None
+    JWT_ALGORITHM: str = "HS256"
+    JWT_AUDIENCE: str | None = None
+    JWT_ISSUER: str | None = None
+    JWT_SCOPE_READ: str = "archive:read"
+    JWT_SCOPE_WRITE: str = "archive:write"
+    JWT_SCOPE_DELETE: str = "archive:delete"
+    JWT_ADMIN_ROLE: str = "admin"
     RATE_LIMIT_PER_MINUTE: int = 0
     RATE_LIMIT_BACKEND: str = "memory"
     REDIS_URL: str | None = None
@@ -34,6 +43,7 @@ class Config(BaseSettings):
     RATE_LIMIT_REDIS_WINDOW_SECONDS: int = 65
     RATE_LIMIT_REDIS_FAILURE_COOLDOWN_SECONDS: int = 5
     RATE_LIMIT_FAIL_OPEN: bool = True
+    TRUSTED_PROXY_CIDRS: str = ""
     CORS_ALLOW_ORIGINS: str = "*"
     CORS_ALLOW_METHODS: str = "GET,POST,DELETE,OPTIONS"
     CORS_ALLOW_HEADERS: str = "*"
@@ -70,6 +80,10 @@ class Config(BaseSettings):
     def allowed_hosts_list(self) -> List[str]:
         values = self._parse_csv(self.ALLOWED_HOSTS)
         return values or ["*"]
+
+    @property
+    def trusted_proxy_cidrs_list(self) -> List[str]:
+        return self._parse_csv(self.TRUSTED_PROXY_CIDRS)
 
     @property
     def rate_limit_backend(self) -> str:

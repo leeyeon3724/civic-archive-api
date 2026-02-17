@@ -1,4 +1,9 @@
 ﻿from datetime import datetime
+import base64
+import hashlib
+import hmac
+import json
+import time
 from unittest.mock import patch
 
 import pytest
@@ -22,6 +27,21 @@ def _assert_standard_error_shape(payload):
     assert isinstance(payload.get("message"), str) and payload["message"]
     assert isinstance(payload.get("error"), str) and payload["error"]
     assert isinstance(payload.get("request_id"), str) and payload["request_id"]
+
+
+def _build_jwt(secret: str, claims: dict) -> str:
+    header = {"alg": "HS256", "typ": "JWT"}
+
+    def _encode(value: dict) -> str:
+        raw = json.dumps(value, separators=(",", ":"), sort_keys=True).encode("utf-8")
+        return base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")
+
+    header_b64 = _encode(header)
+    payload_b64 = _encode(claims)
+    signing_input = f"{header_b64}.{payload_b64}".encode("ascii")
+    signature = hmac.new(secret.encode("utf-8"), signing_input, hashlib.sha256).digest()
+    signature_b64 = base64.urlsafe_b64encode(signature).decode("ascii").rstrip("=")
+    return f"{header_b64}.{payload_b64}.{signature_b64}"
 
 
 def test_parse_datetime_accepts_supported_formats(utils_module):
@@ -313,6 +333,126 @@ def test_api_key_required_for_protected_endpoint(make_engine):
         assert authorized.json() == {"you_sent": {"hello": "world"}}
 
 
+def test_jwt_required_for_protected_endpoint(make_engine):
+    secret = "jwt-test-secret"
+    now = int(time.time())
+    write_token = _build_jwt(
+        secret,
+        {
+            "sub": "user-1",
+            "scope": "archive:write archive:read",
+            "exp": now + 300,
+        },
+    )
+
+    with patch("app.database.create_engine", return_value=make_engine(lambda *_: StubResult())):
+        app = create_app(
+            Config(
+                REQUIRE_JWT=True,
+                JWT_SECRET=secret,
+            )
+        )
+
+    with TestClient(app) as tc:
+        unauthorized = tc.post("/api/echo", json={"hello": "world"})
+        assert unauthorized.status_code == 401
+        assert unauthorized.json()["code"] == "UNAUTHORIZED"
+
+        malformed = tc.post("/api/echo", json={"hello": "world"}, headers={"Authorization": "Bearer bad-token"})
+        assert malformed.status_code == 401
+        assert malformed.json()["code"] == "UNAUTHORIZED"
+
+        authorized = tc.post(
+            "/api/echo",
+            json={"hello": "world"},
+            headers={"Authorization": f"Bearer {write_token}"},
+        )
+        assert authorized.status_code == 200
+        assert authorized.json() == {"you_sent": {"hello": "world"}}
+
+
+def test_jwt_forbidden_without_required_scope(make_engine):
+    secret = "jwt-scope-test-secret"
+    now = int(time.time())
+    read_only_token = _build_jwt(
+        secret,
+        {
+            "sub": "user-2",
+            "scope": "archive:read",
+            "exp": now + 300,
+        },
+    )
+
+    with patch("app.database.create_engine", return_value=make_engine(lambda *_: StubResult())):
+        app = create_app(
+            Config(
+                REQUIRE_JWT=True,
+                JWT_SECRET=secret,
+            )
+        )
+
+    with TestClient(app) as tc:
+        forbidden = tc.post(
+            "/api/echo",
+            json={"hello": "world"},
+            headers={"Authorization": f"Bearer {read_only_token}"},
+        )
+        assert forbidden.status_code == 403
+        assert forbidden.json()["code"] == "FORBIDDEN"
+
+
+def test_jwt_admin_role_bypasses_scope_checks(make_engine):
+    secret = "jwt-admin-test-secret"
+    now = int(time.time())
+    admin_token = _build_jwt(
+        secret,
+        {
+            "sub": "admin-1",
+            "roles": ["admin"],
+            "exp": now + 300,
+        },
+    )
+
+    with patch("app.database.create_engine", return_value=make_engine(lambda *_: StubResult())):
+        app = create_app(
+            Config(
+                REQUIRE_JWT=True,
+                JWT_SECRET=secret,
+            )
+        )
+
+    with TestClient(app) as tc:
+        response = tc.post(
+            "/api/echo",
+            json={"hello": "world"},
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert response.status_code == 200
+
+
+def test_jwt_configuration_requires_secret(make_engine):
+    with patch("app.database.create_engine", return_value=make_engine(lambda *_: StubResult())):
+        with pytest.raises(RuntimeError):
+            create_app(
+                Config(
+                    REQUIRE_JWT=True,
+                    JWT_SECRET=None,
+                )
+            )
+
+
+def test_jwt_algorithm_must_be_hs256(make_engine):
+    with patch("app.database.create_engine", return_value=make_engine(lambda *_: StubResult())):
+        with pytest.raises(RuntimeError):
+            create_app(
+                Config(
+                    REQUIRE_JWT=True,
+                    JWT_SECRET="test-secret",
+                    JWT_ALGORITHM="RS256",
+                )
+            )
+
+
 def test_rate_limit_enforced_for_protected_endpoint(make_engine):
     with patch("app.database.create_engine", return_value=make_engine(lambda *_: StubResult())):
         app = create_app(
@@ -331,6 +471,50 @@ def test_rate_limit_enforced_for_protected_endpoint(make_engine):
         assert body["code"] == "RATE_LIMITED"
         assert body["message"] == "Too Many Requests"
         assert body.get("request_id")
+
+
+def test_rate_limit_uses_xff_when_proxy_is_trusted(make_engine):
+    with patch("app.database.create_engine", return_value=make_engine(lambda *_: StubResult())):
+        app = create_app(
+            Config(
+                RATE_LIMIT_PER_MINUTE=1,
+                TRUSTED_PROXY_CIDRS="127.0.0.1/32",
+            )
+        )
+
+    with patch("app.security._remote_ip", return_value="127.0.0.1"), TestClient(app) as tc:
+        first = tc.post("/api/echo", json={"n": 1}, headers={"X-Forwarded-For": "203.0.113.1"})
+        second = tc.post("/api/echo", json={"n": 2}, headers={"X-Forwarded-For": "203.0.113.2"})
+        assert first.status_code == 200
+        assert second.status_code == 200
+
+
+def test_rate_limit_ignores_xff_when_proxy_is_untrusted(make_engine):
+    with patch("app.database.create_engine", return_value=make_engine(lambda *_: StubResult())):
+        app = create_app(
+            Config(
+                RATE_LIMIT_PER_MINUTE=1,
+                TRUSTED_PROXY_CIDRS="10.0.0.0/8",
+            )
+        )
+
+    with patch("app.security._remote_ip", return_value="127.0.0.1"), TestClient(app) as tc:
+        first = tc.post("/api/echo", json={"n": 1}, headers={"X-Forwarded-For": "203.0.113.1"})
+        second = tc.post("/api/echo", json={"n": 2}, headers={"X-Forwarded-For": "203.0.113.2"})
+        assert first.status_code == 200
+        assert second.status_code == 429
+        assert second.json()["code"] == "RATE_LIMITED"
+
+
+def test_invalid_trusted_proxy_cidrs_are_rejected(make_engine):
+    with patch("app.database.create_engine", return_value=make_engine(lambda *_: StubResult())):
+        with pytest.raises(RuntimeError):
+            create_app(
+                Config(
+                    RATE_LIMIT_PER_MINUTE=1,
+                    TRUSTED_PROXY_CIDRS="not-a-cidr",
+                )
+            )
 
 
 def test_rate_limit_backend_rejects_invalid_value(make_engine):

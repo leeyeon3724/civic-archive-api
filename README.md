@@ -45,6 +45,15 @@ Copy-Item .env.example .env
 | `LOG_JSON` | `1` | JSON 구조화 로그 사용 여부 |
 | `REQUIRE_API_KEY` | `0` | `1`이면 `/api/*` 엔드포인트에 `X-API-Key` 필수 |
 | `API_KEY` | `` | API 키 값 (`REQUIRE_API_KEY=1`일 때 필수) |
+| `REQUIRE_JWT` | `0` | `1`이면 `/api/*` 엔드포인트에 `Authorization: Bearer <JWT>` 필수 |
+| `JWT_SECRET` | `` | JWT HMAC secret (`REQUIRE_JWT=1`일 때 필수) |
+| `JWT_ALGORITHM` | `HS256` | 현재 `HS256`만 지원 |
+| `JWT_AUDIENCE` | `` | 지정 시 `aud` 클레임 검증 |
+| `JWT_ISSUER` | `` | 지정 시 `iss` 클레임 검증 |
+| `JWT_SCOPE_READ` | `archive:read` | 읽기( GET/HEAD ) 권한 scope |
+| `JWT_SCOPE_WRITE` | `archive:write` | 쓰기( POST/PUT/PATCH ) 권한 scope |
+| `JWT_SCOPE_DELETE` | `archive:delete` | 삭제( DELETE ) 권한 scope |
+| `JWT_ADMIN_ROLE` | `admin` | 이 role 보유 시 scope 검사 우회 |
 | `RATE_LIMIT_PER_MINUTE` | `0` | IP 기준 분당 요청 제한 (`0`이면 비활성) |
 | `RATE_LIMIT_BACKEND` | `memory` | rate limit 저장소 (`memory` 또는 `redis`) |
 | `REDIS_URL` | `` | Redis 연결 URL (`RATE_LIMIT_BACKEND=redis`일 때 필수) |
@@ -52,6 +61,7 @@ Copy-Item .env.example .env
 | `RATE_LIMIT_REDIS_WINDOW_SECONDS` | `65` | Redis 고정 윈도우 TTL(초) |
 | `RATE_LIMIT_REDIS_FAILURE_COOLDOWN_SECONDS` | `5` | Redis 장애 시 재시도 쿨다운(초) |
 | `RATE_LIMIT_FAIL_OPEN` | `1` | Redis 장애 시 요청 허용 여부 (`1` 허용 / `0` 차단) |
+| `TRUSTED_PROXY_CIDRS` | `` | 신뢰할 프록시 CIDR 목록(쉼표 구분). 설정 시에만 `X-Forwarded-For` 신뢰 |
 | `CORS_ALLOW_ORIGINS` | `*` | 허용 Origin 목록(쉼표 구분) |
 | `CORS_ALLOW_METHODS` | `GET,POST,DELETE,OPTIONS` | 허용 HTTP 메서드(쉼표 구분) |
 | `CORS_ALLOW_HEADERS` | `*` | 허용 헤더(쉼표 구분) |
@@ -67,9 +77,11 @@ Copy-Item .env.example .env
 
 - 기본값(`REQUIRE_API_KEY=0`)은 로컬 개발 편의를 위한 설정입니다.
 - 운영 환경에서는 `REQUIRE_API_KEY=1`, `API_KEY=<secret>` 적용을 권장합니다.
+- 운영 환경에서는 `REQUIRE_JWT=1`과 scope/role 정책 적용을 권장합니다.
 - `RATE_LIMIT_PER_MINUTE`로 `/api/*` 엔드포인트 요청 제한을 활성화할 수 있습니다.
 - 다중 인스턴스 환경에서는 `RATE_LIMIT_BACKEND=redis`, `REDIS_URL=redis://...` 구성을 권장합니다.
 - Redis 장애 시 동작은 `RATE_LIMIT_FAIL_OPEN`과 `RATE_LIMIT_REDIS_FAILURE_COOLDOWN_SECONDS`로 제어합니다.
+- 프록시 환경에서는 `TRUSTED_PROXY_CIDRS`를 명시해 신뢰 경계를 설정해야 합니다.
 
 ## 마이그레이션
 

@@ -32,10 +32,16 @@
 - 모든 응답 헤더에 `X-Request-Id` 포함
 - 검증 실패는 `400 (VALIDATION_ERROR)`로 응답
 - 인증이 활성화된 경우(`REQUIRE_API_KEY=1`) `/api/*` 요청에 `X-API-Key` 헤더 필수
+- JWT 인증이 활성화된 경우(`REQUIRE_JWT=1`) `/api/*` 요청에 `Authorization: Bearer <token>` 헤더 필수
+  - `JWT_ALGORITHM`: 현재 `HS256`만 지원
+  - `JWT_AUDIENCE`/`JWT_ISSUER` 설정 시 `aud`/`iss` 클레임 검증
+  - 메서드별 scope 정책: `JWT_SCOPE_READ`, `JWT_SCOPE_WRITE`, `JWT_SCOPE_DELETE`
+  - `JWT_ADMIN_ROLE` role 보유 시 scope 검사 우회
 - 요청 제한이 활성화된 경우(`RATE_LIMIT_PER_MINUTE>0`) IP 기준 `429 (RATE_LIMITED)` 응답 가능
   - 백엔드: `RATE_LIMIT_BACKEND=memory|redis` (`redis` 사용 시 `REDIS_URL` 필요)
   - Redis 장애 시 fallback 정책: `RATE_LIMIT_FAIL_OPEN` (`1`=허용, `0`=차단)
   - Redis 장애 재시도 쿨다운: `RATE_LIMIT_REDIS_FAILURE_COOLDOWN_SECONDS`
+  - 프록시 환경에서는 `TRUSTED_PROXY_CIDRS`에 지정한 CIDR에서만 `X-Forwarded-For`를 신뢰
 
 ## 유틸리티 엔드포인트
 

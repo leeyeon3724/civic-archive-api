@@ -9,6 +9,7 @@ from fastapi.responses import JSONResponse
 DEFAULT_ERROR_CODES = {
     400: "BAD_REQUEST",
     401: "UNAUTHORIZED",
+    403: "FORBIDDEN",
     404: "NOT_FOUND",
     429: "RATE_LIMITED",
     422: "VALIDATION_ERROR",

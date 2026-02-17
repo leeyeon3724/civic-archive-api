@@ -16,7 +16,12 @@ from app.logging_config import configure_logging
 from app.observability import register_observability
 from app.routes import register_routes
 from app.schemas import EchoResponse, ErrorResponse, HealthResponse, ReadinessCheck, ReadinessResponse
-from app.security import build_api_key_dependency, build_rate_limit_dependency, check_rate_limit_backend_health
+from app.security import (
+    build_api_key_dependency,
+    build_jwt_dependency,
+    build_rate_limit_dependency,
+    check_rate_limit_backend_health,
+)
 from app.version import APP_VERSION
 
 OPENAPI_TAGS = [
@@ -46,6 +51,10 @@ def create_app(config=None):
         raise RuntimeError("BOOTSTRAP_TABLES_ON_STARTUP is disabled. Run 'alembic upgrade head' before startup.")
     if config.REQUIRE_API_KEY and not (config.API_KEY or "").strip():
         raise RuntimeError("REQUIRE_API_KEY=1 requires API_KEY to be set.")
+    if config.REQUIRE_JWT and not (config.JWT_SECRET or "").strip():
+        raise RuntimeError("REQUIRE_JWT=1 requires JWT_SECRET to be set.")
+    if config.REQUIRE_JWT and (config.JWT_ALGORITHM or "").strip().upper() != "HS256":
+        raise RuntimeError("JWT_ALGORITHM must be HS256.")
     if config.rate_limit_backend not in {"memory", "redis"}:
         raise RuntimeError("RATE_LIMIT_BACKEND must be one of: memory, redis.")
     if config.rate_limit_backend == "redis" and not (config.REDIS_URL or "").strip():
@@ -65,8 +74,9 @@ def create_app(config=None):
     register_observability(api)
 
     api_key_dependency = build_api_key_dependency(config)
+    jwt_dependency = build_jwt_dependency(config)
     rate_limit_dependency = build_rate_limit_dependency(config)
-    protected_dependencies = [Depends(api_key_dependency), Depends(rate_limit_dependency)]
+    protected_dependencies = [Depends(api_key_dependency), Depends(jwt_dependency), Depends(rate_limit_dependency)]
     register_routes(api, dependencies=protected_dependencies)
 
     def _db_ready() -> tuple[bool, str | None]:
@@ -118,7 +128,13 @@ def create_app(config=None):
         summary="Echo request payload",
         dependencies=protected_dependencies,
         response_model=EchoResponse,
-        responses={400: {"model": ErrorResponse}, 401: {"model": ErrorResponse}, 429: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
+        responses={
+            400: {"model": ErrorResponse},
+            401: {"model": ErrorResponse},
+            403: {"model": ErrorResponse},
+            429: {"model": ErrorResponse},
+            500: {"model": ErrorResponse},
+        },
     )
     async def echo(request: Request, _payload: dict = Body(default_factory=dict)):
         try:
