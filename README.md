@@ -44,6 +44,8 @@ Copy-Item .env.example .env
 | `DB_POOL_RECYCLE_SECONDS` | `3600` | 유휴 커넥션 재생성 주기(초) |
 | `DB_CONNECT_TIMEOUT_SECONDS` | `3` | DB TCP 연결 타임아웃(초) |
 | `DB_STATEMENT_TIMEOUT_MS` | `5000` | PostgreSQL statement timeout(ms) |
+| `INGEST_MAX_BATCH_ITEMS` | `200` | 단건 수집 API(`POST /api/*`) 최대 batch item 수 |
+| `MAX_REQUEST_BODY_BYTES` | `1048576` | `/api/*` write 요청 최대 payload 크기(bytes) |
 | `DEBUG` | `0` | 서버 debug/reload 모드 |
 | `APP_ENV` | `development` | 실행 환경 (`development`/`staging`/`production`) |
 | `SECURITY_STRICT_MODE` | `0` | `1`이면 운영 보안 가드 강제(아래 설명 참고) |
@@ -95,6 +97,7 @@ Copy-Item .env.example .env
 - 다중 인스턴스 환경에서는 `RATE_LIMIT_BACKEND=redis`, `REDIS_URL=redis://...` 구성을 권장합니다.
 - Redis 장애 시 동작은 `RATE_LIMIT_FAIL_OPEN`과 `RATE_LIMIT_REDIS_FAILURE_COOLDOWN_SECONDS`로 제어합니다.
 - 프록시 환경에서는 `TRUSTED_PROXY_CIDRS`를 명시해 신뢰 경계를 설정해야 합니다.
+- 쓰기 요청 과부하 방지를 위해 `INGEST_MAX_BATCH_ITEMS`, `MAX_REQUEST_BODY_BYTES`를 운영 환경에 맞게 조정합니다.
 
 ## 마이그레이션
 

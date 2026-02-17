@@ -22,6 +22,7 @@
 - SLO 정책/배포 가드 스크립트 추가 (`scripts/check_slo_policy.py`, `scripts/check_runtime_health.py`)
 - DB 런타임 튜닝 옵션 추가 (`DB_POOL_SIZE`, `DB_MAX_OVERFLOW`, `DB_POOL_TIMEOUT_SECONDS`, `DB_POOL_RECYCLE_SECONDS`, `DB_CONNECT_TIMEOUT_SECONDS`, `DB_STATEMENT_TIMEOUT_MS`)
 - 성능 정책 문서 추가 (`docs/PERFORMANCE.md`: endpoint latency budget, benchmark profile)
+- ingest/load 안전 가드 옵션 추가 (`INGEST_MAX_BATCH_ITEMS`, `MAX_REQUEST_BODY_BYTES`)
 
 ### 변경됨
 
@@ -36,6 +37,7 @@
 - CI에 SLO 정책 기준선 검사 단계 추가 (`.github/workflows/docs-contract.yml`)
 - 앱 시작 시 DB 런타임 튜닝 값 검증을 추가하고 `init_db`에 풀/타임아웃 설정을 연결
 - benchmark 스크립트에 시나리오 태그/프로파일 임계값(`dev/staging/prod`)과 다중 임계값 평가를 추가
+- `/api/*` write 요청에 payload 크기/배치 수 상한 가드를 적용하고 초과 시 `413 PAYLOAD_TOO_LARGE`를 반환
 
 ### 수정됨
 

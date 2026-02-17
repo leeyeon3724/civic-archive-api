@@ -64,6 +64,9 @@ PR 본문에 아래 항목을 포함합니다.
   - 필요 시 SBOM 갱신/첨부 (`cyclonedx-py requirements ...`)
 - 운영/가용성 변경 PR
   - `python scripts/check_runtime_health.py --base-url <target>`
+- 처리량/성능 가드 변경 PR
+  - `python scripts/benchmark_queries.py --profile staging`
+  - oversized payload(`413 PAYLOAD_TOO_LARGE`) 동작 확인 결과 첨부
 
 ## 코드 리뷰 포인트
 

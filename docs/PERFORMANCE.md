@@ -75,3 +75,12 @@ python scripts/benchmark_queries.py --profile prod --runs 40 --seed-rows 500
 | `news_list` | 210 | 230 | `+9.5%` |
 | `minutes_list` | 240 | 236 | `-1.7%` |
 | `segments_list` | 280 | 295 | `+5.4%` |
+
+## Throughput Guardrails Draft
+
+- Batch ingest limit: `INGEST_MAX_BATCH_ITEMS` (default `200`)
+- Request size limit: `MAX_REQUEST_BODY_BYTES` (default `1,048,576`)
+- Oversize fallback behavior:
+  - reject request with `413 PAYLOAD_TOO_LARGE`
+  - include `details` with configured limit and observed value
+- 운영 체크리스트 연계: `docs/OPERATIONS.md`의 Stabilize/Runtime checks 항목에서 확인

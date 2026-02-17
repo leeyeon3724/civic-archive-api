@@ -43,6 +43,9 @@
   - Redis 장애 시 fallback 정책: `RATE_LIMIT_FAIL_OPEN` (`1`=허용, `0`=차단)
   - Redis 장애 재시도 쿨다운: `RATE_LIMIT_REDIS_FAILURE_COOLDOWN_SECONDS`
   - 프록시 환경에서는 `TRUSTED_PROXY_CIDRS`에 지정한 CIDR에서만 `X-Forwarded-For`를 신뢰
+- write 요청(`/api/*` + `POST/PUT/PATCH`)은 payload 상한 적용
+  - 요청 본문 크기 상한: `MAX_REQUEST_BODY_BYTES` (초과 시 `413 PAYLOAD_TOO_LARGE`)
+  - 배치 item 상한: `INGEST_MAX_BATCH_ITEMS` (초과 시 `413 PAYLOAD_TOO_LARGE`)
 
 ## 유틸리티 엔드포인트
 
@@ -69,6 +72,7 @@
 - 요청: JSON(본문이 없으면 `{}`)
 - 응답: `{"you_sent": <요청 JSON>}`
 - 인증 활성화 시 `X-API-Key` 필요
+- oversized payload는 `413 (PAYLOAD_TOO_LARGE)` 가능
 
 ## 뉴스 (`/api/news`)
 
@@ -85,6 +89,7 @@
 - 중복 기준: `url` UNIQUE + upsert
 - 인증 활성화 시 `401 (UNAUTHORIZED)` 가능
 - 요청 제한 활성화 시 `429 (RATE_LIMITED)` 가능
+- 배치/요청 크기 상한 초과 시 `413 (PAYLOAD_TOO_LARGE)` 가능
 
 ### GET `/api/news`
 - 쿼리: `q`, `source`, `from`, `to`, `page`, `size`
@@ -114,6 +119,7 @@
 - 중복 기준: `url` UNIQUE + upsert
 - 인증 활성화 시 `401 (UNAUTHORIZED)` 가능
 - 요청 제한 활성화 시 `429 (RATE_LIMITED)` 가능
+- 배치/요청 크기 상한 초과 시 `413 (PAYLOAD_TOO_LARGE)` 가능
 
 `meeting_no` 정규화:
 - 문자열이면 그대로 `meeting_no_combined` 저장
@@ -150,6 +156,7 @@
 - 중복 기준: 서버 계산 `dedupe_hash` (정규화된 주요 필드 JSON의 SHA-256)
 - 인증 활성화 시 `401 (UNAUTHORIZED)` 가능
 - 요청 제한 활성화 시 `429 (RATE_LIMITED)` 가능
+- 배치/요청 크기 상한 초과 시 `413 (PAYLOAD_TOO_LARGE)` 가능
 
 ### GET `/api/segments`
 - 쿼리: `q`, `council`, `committee`, `session`, `meeting_no`, `importance`, `party`, `constituency`, `department`, `from`, `to`, `page`, `size`

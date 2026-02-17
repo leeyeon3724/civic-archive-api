@@ -13,7 +13,7 @@
 | P2 | Operations hardening | Redis rate limiter hardening, metrics cardinality protection, version policy automation | Completed |
 | P3 | Security and operations hardening | JWT/RBAC, trusted proxy chain validation, SBOM/vulnerability scan | Completed |
 | P4 | SLO and observability ops | SLI/SLO, error budget policy, alert policy | Completed |
-| P5 | Performance and scalability baseline | DB pool/runtime timeout tuning, query latency guardrails | In Progress |
+| P5 | Performance and scalability baseline | DB pool/runtime timeout tuning, query latency guardrails | Completed |
 
 ## P1 Backlog (Current Scope)
 
@@ -162,9 +162,9 @@
 
 ### 3) Throughput and Load Safety
 
-- [ ] Define batch ingest limits and fallback behavior for oversized payloads
-- [ ] Add request-size/load-shedding guard policy draft
-- [ ] Link throughput guardrails to runbook checklist
+- [x] Define batch ingest limits and fallback behavior for oversized payloads
+- [x] Add request-size/load-shedding guard policy draft
+- [x] Link throughput guardrails to runbook checklist
 
 ## Definition of Done (P5-In Progress)
 

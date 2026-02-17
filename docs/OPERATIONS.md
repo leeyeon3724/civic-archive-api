@@ -22,6 +22,7 @@
 - If active rollout: pause or rollback deploy
 - If dependency issue: switch to degrade mode as documented
 - Protect database from overload (throttle or temporarily reduce write pressure)
+- For ingest surge: temporarily lower `INGEST_MAX_BATCH_ITEMS` and `MAX_REQUEST_BODY_BYTES` via config rollout
 
 3. Diagnose
 - Check health endpoints:
@@ -64,6 +65,9 @@ Quality and policy checks:
 Runtime checks:
 
 - `python scripts/check_runtime_health.py --base-url http://localhost:8000`
+- Verify oversized payload guard:
+  - confirm `413 PAYLOAD_TOO_LARGE` is returned for request size violations
+  - confirm batch ingest limit blocks oversized list payloads
 
 Performance regression:
 
