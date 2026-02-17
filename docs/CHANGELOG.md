@@ -36,6 +36,7 @@
 - service/repository 포트 인터페이스 모듈 추가 (`app/ports/services.py`, `app/ports/repositories.py`)
 - 타입체크 스크립트/설정 추가 (`scripts/check_mypy.py`, `mypy.ini`)
 - JWT leeway 설정 추가 (`JWT_LEEWAY_SECONDS`)
+- E2E 실서버 검증 워크플로우 추가 (`.github/workflows/e2e-live.yml`, Docker Compose 기반)
 
 ### 변경됨
 
@@ -69,6 +70,9 @@
 - 서비스/리포지토리 Port Protocol 정의를 서비스 구현 파일에서 분리해 `app/ports/*`로 이동
 - CI 문서 계약 워크플로우에 phase-1 mypy 체크(경고 모드) 단계를 추가
 - JWT 검증을 수동 구현에서 `PyJWT` 기반 검증으로 전환하고 `sub`/`exp` 필수 정책을 적용
+- DB 접근 경로를 앱 상태 기반 `connection_provider` 주입으로 일원화하고 전역 `database.engine` 의존을 제거
+- 뉴스/회의록/세그먼트 배치 쓰기를 JSON recordset 기반 단일 SQL 실행으로 최적화해 row-by-row 루프를 제거
+- E2E 테스트에 `E2E_REQUIRE_TARGET=1` 강제 모드를 추가해 CI에서 skip 대신 실패로 검증 신뢰성을 강화
 
 ### 수정됨
 

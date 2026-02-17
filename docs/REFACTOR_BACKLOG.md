@@ -301,3 +301,23 @@
 - SLO policy check passes
 - `create_app()` responsibilities are split across bootstrap modules
 - `docs/CHANGELOG.md` updated
+
+## Post-P8 Execution Backlog
+
+### P0) DB DI Finalization
+
+- [x] Remove global `database.engine` runtime dependency from app/service/repository paths
+- [x] Wire DB access through `app.state.connection_provider` (request/runtime DI single source)
+- [x] Unify test fixtures to provider-based injection instead of engine monkeypatch pattern
+
+### P1) Batch Write Optimization
+
+- [x] Refactor news/minutes upsert to JSON recordset based single-statement execution
+- [x] Refactor segments insert to JSON recordset based batch execution
+- [x] Preserve insert/update counting contract in batch path
+
+### P1) E2E CI Workflow
+
+- [x] Add executable E2E workflow using Docker Compose (`db` + `api`)
+- [x] Add strict mode (`E2E_REQUIRE_TARGET=1`) so unreachable target fails CI (no silent skip)
+- [x] Keep local/manual skip behavior for non-CI live-target runs
