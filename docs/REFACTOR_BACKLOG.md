@@ -327,4 +327,4 @@
 - [x] Split observability middleware internals into pure functions (status/log-payload/metrics observer)
 - [x] Add dedicated exception-path focused observability unit tests
 - [x] Promote mypy gate to phase-2 blocking mode (scope: `services/ports/repositories/observability`)
-- [x] Add Bandit static security scan to supply-chain workflow (temporary `B608` skip with tracked follow-up)
+- [x] Refactor repository list query builders to SQLAlchemy expressions and remove Bandit `B608` temporary skip

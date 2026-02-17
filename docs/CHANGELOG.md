@@ -79,7 +79,8 @@
 - `check_runtime_health.py` HTTP 호출을 `requests` 기반으로 정리하고 URL scheme 제한을 추가
 - mypy 기본 실행 모드를 `fail`로 승격하고 검사 범위를 `repositories`/`observability`까지 확장
 - CI 문서 계약 워크플로우의 mypy 단계를 phase-2 blocking 모드로 승격
-- 공급망 보안 워크플로우에 Bandit 정적 보안 스캔 단계를 추가 (`B608`은 별도 SQLAlchemy 쿼리 리팩토링 후 재활성화 예정)
+- repository list 쿼리(news/minutes/segments)를 SQLAlchemy 표현식 기반 빌더로 전환해 동적 SQL 문자열 조합을 제거
+- 공급망 보안 워크플로우 Bandit 실행에서 `B608` 임시 제외를 제거하고 전체 규칙을 활성화
 
 ### 수정됨
 

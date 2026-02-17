@@ -85,7 +85,7 @@ PR 본문에 아래 항목을 포함합니다.
   - 처리량/성능 가드 변경 시 oversized payload(`413 PAYLOAD_TOO_LARGE`) 동작 확인 결과 첨부
 - 보안/공급망 변경 PR
   - `pip-audit -r requirements.txt -r requirements-dev.txt`
-  - `bandit -q -r app scripts -ll -s B608`
+  - `bandit -q -r app scripts -ll`
   - 필요 시 SBOM 갱신/첨부 (`cyclonedx-py requirements ...`)
 - 운영/가용성 변경 PR
   - `python scripts/check_runtime_health.py --base-url <target>`
