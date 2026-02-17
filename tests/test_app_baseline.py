@@ -772,7 +772,7 @@ def test_request_size_guard_rejects_large_content_length(make_engine):
         assert payload["details"]["content_length"] > 64
 
 
-def test_request_size_guard_checks_buffered_body_even_without_reliable_content_length(make_engine):
+def test_request_size_guard_rejects_oversized_streaming_body_without_reliable_content_length(make_engine):
     with patch("app.database.create_engine", return_value=make_engine(lambda *_: StubResult())):
         app = create_app(Config(MAX_REQUEST_BODY_BYTES=64))
 
@@ -792,3 +792,4 @@ def test_request_size_guard_checks_buffered_body_even_without_reliable_content_l
         assert payload["code"] == "PAYLOAD_TOO_LARGE"
         assert payload["details"]["max_request_body_bytes"] == 64
         assert payload["details"]["request_body_bytes"] > 64
+        assert "content_length" not in payload["details"]

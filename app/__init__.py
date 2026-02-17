@@ -98,8 +98,10 @@ def create_app(config=None):
 
     @api.middleware("http")
     async def request_size_guard(request: Request, call_next):
+        guard_details_attr = "_request_size_guard_details"
         if request.url.path.startswith("/api/") and request.method in {"POST", "PUT", "PATCH"}:
             max_request_body_bytes = int(config.MAX_REQUEST_BODY_BYTES)
+            content_length = None
             content_length_raw = (request.headers.get("content-length") or "").strip()
             if content_length_raw:
                 try:
@@ -122,15 +124,35 @@ def create_app(config=None):
                             "content_length": content_length,
                         },
                     )
-            body = await request.body()
-            body_size = len(body)
-            if body_size > max_request_body_bytes:
-                details = {
-                    "max_request_body_bytes": max_request_body_bytes,
-                    "request_body_bytes": body_size,
-                }
-                if content_length_raw:
-                    details["content_length"] = int(content_length_raw)
+            received_bytes = 0
+            original_receive = request._receive  # type: ignore[attr-defined]
+
+            async def guarded_receive() -> dict:
+                nonlocal received_bytes
+                message = await original_receive()
+                if message.get("type") != "http.request":
+                    return message
+
+                chunk = message.get("body", b"") or b""
+                received_bytes += len(chunk)
+                if received_bytes > max_request_body_bytes:
+                    details = {
+                        "max_request_body_bytes": max_request_body_bytes,
+                        "request_body_bytes": received_bytes,
+                    }
+                    if content_length is not None:
+                        details["content_length"] = content_length
+                    setattr(request.state, guard_details_attr, details)
+                    # Stop reading request body as soon as the limit is exceeded.
+                    return {"type": "http.request", "body": b"", "more_body": False}
+                return message
+
+            request._receive = guarded_receive  # type: ignore[attr-defined]
+        try:
+            response = await call_next(request)
+        except Exception:
+            details = getattr(request.state, guard_details_attr, None)
+            if details is not None:
                 return error_response(
                     request,
                     status_code=413,
@@ -138,13 +160,18 @@ def create_app(config=None):
                     message="Payload Too Large",
                     details=details,
                 )
+            raise
 
-            # Re-inject the buffered body so downstream handlers can parse JSON normally.
-            async def _receive() -> dict:
-                return {"type": "http.request", "body": body, "more_body": False}
-
-            request._receive = _receive  # type: ignore[attr-defined]
-        return await call_next(request)
+        details = getattr(request.state, guard_details_attr, None)
+        if details is not None:
+            return error_response(
+                request,
+                status_code=413,
+                code="PAYLOAD_TOO_LARGE",
+                message="Payload Too Large",
+                details=details,
+            )
+        return response
 
     init_db(
         config.DATABASE_URL,
