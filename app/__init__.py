@@ -1,7 +1,6 @@
 import logging
-from collections.abc import Generator
-from contextlib import contextmanager
-from typing import Any
+from contextlib import AbstractContextManager
+from typing import Any, cast
 
 from fastapi import Depends, FastAPI
 from sqlalchemy import text
@@ -63,10 +62,8 @@ def create_app(app_config: Config | None = None) -> FastAPI:
         statement_timeout_ms=app_config.DB_STATEMENT_TIMEOUT_MS,
     )
 
-    @contextmanager
-    def connection_provider() -> Generator[Connection, None, None]:
-        with db_engine.begin() as conn:
-            yield conn
+    def connection_provider() -> AbstractContextManager[Connection]:
+        return cast(AbstractContextManager[Connection], cast(object, db_engine.begin()))
 
     api.state.db_engine = db_engine
     api.state.connection_provider = connection_provider

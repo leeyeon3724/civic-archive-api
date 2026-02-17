@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from app.ports.repositories import MinutesRepositoryPort
 from app.ports.services import MinutesServicePort
@@ -49,7 +49,8 @@ class MinutesService:
     def __init__(self, *, repository: MinutesRepositoryPort) -> None:
         self._repository = repository
 
-    def normalize_minutes(self, item: dict[str, Any]) -> dict[str, Any]:
+    @staticmethod
+    def normalize_minutes(item: dict[str, Any]) -> dict[str, Any]:
         return _normalize_minutes(item)
 
     def upsert_minutes(self, items: list[dict[str, Any]]) -> tuple[int, int]:
@@ -93,7 +94,7 @@ def build_minutes_service(
     repository: MinutesRepositoryPort | None = None,
 ) -> MinutesServicePort:
     selected_repository = repository or MinutesRepository(connection_provider=connection_provider)
-    return MinutesService(repository=selected_repository)
+    return cast(MinutesServicePort, cast(object, MinutesService(repository=selected_repository)))
 
 
 def normalize_minutes(item: dict[str, Any]) -> dict[str, Any]:

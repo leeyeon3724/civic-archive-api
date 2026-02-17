@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from app.ports.repositories import NewsRepositoryPort
 from app.ports.services import NewsServicePort
@@ -34,7 +34,8 @@ class NewsService:
     def __init__(self, *, repository: NewsRepositoryPort) -> None:
         self._repository = repository
 
-    def normalize_article(self, item: dict[str, Any]) -> dict[str, Any]:
+    @staticmethod
+    def normalize_article(item: dict[str, Any]) -> dict[str, Any]:
         return _normalize_article(item)
 
     def upsert_articles(self, items: list[dict[str, Any]]) -> tuple[int, int]:
@@ -72,7 +73,7 @@ def build_news_service(
     repository: NewsRepositoryPort | None = None,
 ) -> NewsServicePort:
     selected_repository = repository or NewsRepository(connection_provider=connection_provider)
-    return NewsService(repository=selected_repository)
+    return cast(NewsServicePort, cast(object, NewsService(repository=selected_repository)))
 
 
 def normalize_article(item: dict[str, Any]) -> dict[str, Any]:

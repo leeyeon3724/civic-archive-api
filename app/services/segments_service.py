@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 from datetime import date, datetime
-from typing import Any
+from typing import Any, cast
 
 from app.ports.repositories import SegmentsRepositoryPort
 from app.ports.services import SegmentsServicePort
@@ -126,7 +126,8 @@ class SegmentsService:
     def __init__(self, *, repository: SegmentsRepositoryPort) -> None:
         self._repository = repository
 
-    def normalize_segment(self, item: dict[str, Any]) -> dict[str, Any]:
+    @staticmethod
+    def normalize_segment(item: dict[str, Any]) -> dict[str, Any]:
         return _normalize_segment(item)
 
     def insert_segments(self, items: list[dict[str, Any]]) -> int:
@@ -178,7 +179,7 @@ def build_segments_service(
     repository: SegmentsRepositoryPort | None = None,
 ) -> SegmentsServicePort:
     selected_repository = repository or SegmentsRepository(connection_provider=connection_provider)
-    return SegmentsService(repository=selected_repository)
+    return cast(SegmentsServicePort, cast(object, SegmentsService(repository=selected_repository)))
 
 
 def normalize_segment(item: dict[str, Any]) -> dict[str, Any]:
