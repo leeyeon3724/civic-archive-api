@@ -6,13 +6,10 @@ from conftest import StubResult
 def test_news_upsert_batch_dedupes_same_url_with_last_item_wins(news_module, make_connection_provider):
     captured_items = {}
 
-    def handler(statement, params):
-        sql = str(statement).lower()
-        if "insert into news_articles" in sql:
-            parsed_items = json.loads(params["items"])
-            captured_items["payload"] = parsed_items
-            return StubResult(rows=[{"inserted": 1, "updated": 0}])
-        return StubResult()
+    def handler(_statement, params):
+        parsed_items = json.loads(params["items"])
+        captured_items["payload"] = parsed_items
+        return StubResult(rows=[{"inserted": 1, "updated": 0}])
 
     connection_provider, _ = make_connection_provider(handler)
     inserted, updated = news_module.upsert_articles(
@@ -34,13 +31,10 @@ def test_news_upsert_batch_dedupes_same_url_with_last_item_wins(news_module, mak
 def test_minutes_upsert_batch_dedupes_same_url_with_last_item_wins(minutes_module, make_connection_provider):
     captured_items = {}
 
-    def handler(statement, params):
-        sql = str(statement).lower()
-        if "insert into council_minutes" in sql:
-            parsed_items = json.loads(params["items"])
-            captured_items["payload"] = parsed_items
-            return StubResult(rows=[{"inserted": 1, "updated": 0}])
-        return StubResult()
+    def handler(_statement, params):
+        parsed_items = json.loads(params["items"])
+        captured_items["payload"] = parsed_items
+        return StubResult(rows=[{"inserted": 1, "updated": 0}])
 
     connection_provider, _ = make_connection_provider(handler)
     inserted, updated = minutes_module.upsert_minutes(

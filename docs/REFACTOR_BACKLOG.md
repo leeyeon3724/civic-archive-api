@@ -454,11 +454,11 @@
 ### Ticket P2-1: Test Resilience Against SQL Rendering Changes
 
 - Priority: P2
-- Status: In Progress
+- Status: Completed
 - Tasks:
   - [x] reduce SQL string rendering assertions in tests
   - [x] shift to behavior-focused assertions (params, row mapping, pagination offsets, call counts)
-  - keep minimal SQL shape assertions only where contractually necessary
+  - [x] keep minimal SQL shape assertions only where contractually necessary
 - Done Criteria:
   - repository/service tests do not depend on exact SQL text rendering
   - query builder refactors no longer trigger broad test rewrites

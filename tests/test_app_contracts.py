@@ -16,6 +16,7 @@ def _assert_common_list_select_params(first_select_params):
     assert first_select_params["limit"] == 1
     assert first_select_params["offset"] == 1
     assert first_select_params["q"] == "%budget%"
+    assert first_select_params["q_fts"] == "budget"
     assert first_select_params["council"] == "A"
     assert first_select_params["committee"] == "B"
     assert first_select_params["session"] == "C"
@@ -59,11 +60,8 @@ def test_list_segments_invalid_pagination_returns_400(client):
 
 
 def test_upsert_minutes_counts_insert_and_update(minutes_module, make_connection_provider):
-    def handler(statement, _params):
-        sql = str(statement).lower()
-        if "insert into council_minutes" in sql:
-            return StubResult(rows=[{"inserted": 1, "updated": 2}])
-        return StubResult()
+    def handler(_statement, _params):
+        return StubResult(rows=[{"inserted": 1, "updated": 2}])
 
     connection_provider, _ = make_connection_provider(handler)
 
@@ -110,11 +108,11 @@ def test_save_minutes_rejects_invalid_json_body(client):
 
 
 def test_list_minutes_returns_paginated_payload_and_filter_params(client, use_stub_connection_provider):
-    def handler(statement, _params):
-        sql = str(statement).lower()
-        if "select count(*) as total" in sql:
-            return StubResult(scalar_value=1)
-        if "from council_minutes" in sql:
+    call_state = {"calls": 0}
+
+    def handler(_statement, _params):
+        if call_state["calls"] == 0:
+            call_state["calls"] += 1
             return StubResult(
                 rows=[
                     {
@@ -133,7 +131,7 @@ def test_list_minutes_returns_paginated_payload_and_filter_params(client, use_st
                     }
                 ]
             )
-        return StubResult()
+        return StubResult(scalar_value=1)
 
     engine = use_stub_connection_provider(handler)
 
@@ -154,9 +152,8 @@ def test_list_minutes_returns_paginated_payload_and_filter_params(client, use_st
 
 
 def test_get_minutes_success_and_404(client, use_stub_connection_provider):
-    def handler(statement, params):
-        sql = str(statement).lower()
-        if "from council_minutes" in sql and "where id=:id" in sql and params["id"] == 1:
+    def handler(_statement, params):
+        if params["id"] == 1:
             return StubResult(
                 rows=[
                     {
@@ -176,7 +173,7 @@ def test_get_minutes_success_and_404(client, use_stub_connection_provider):
                     }
                 ]
             )
-        if "from council_minutes" in sql and "where id=:id" in sql and params["id"] == 2:
+        if params["id"] == 2:
             return StubResult(rows=[])
         return StubResult()
 
@@ -192,11 +189,10 @@ def test_get_minutes_success_and_404(client, use_stub_connection_provider):
 
 
 def test_delete_minutes_success_and_not_found(client, use_stub_connection_provider):
-    def handler(statement, params):
-        sql = str(statement).lower()
-        if "delete from council_minutes" in sql and params["id"] == 1:
+    def handler(_statement, params):
+        if params["id"] == 1:
             return StubResult(rowcount=1)
-        if "delete from council_minutes" in sql and params["id"] == 2:
+        if params["id"] == 2:
             return StubResult(rowcount=0)
         return StubResult()
 
@@ -239,11 +235,11 @@ def test_save_segments_rejects_invalid_json_body(client):
 
 
 def test_list_segments_returns_paginated_payload_and_filter_params(client, use_stub_connection_provider):
-    def handler(statement, _params):
-        sql = str(statement).lower()
-        if "select count(*) as total" in sql:
-            return StubResult(scalar_value=1)
-        if "from council_speech_segments" in sql:
+    call_state = {"calls": 0}
+
+    def handler(_statement, _params):
+        if call_state["calls"] == 0:
+            call_state["calls"] += 1
             return StubResult(
                 rows=[
                     {
@@ -266,7 +262,7 @@ def test_list_segments_returns_paginated_payload_and_filter_params(client, use_s
                     }
                 ]
             )
-        return StubResult()
+        return StubResult(scalar_value=1)
 
     engine = use_stub_connection_provider(handler)
 
@@ -292,9 +288,8 @@ def test_list_segments_returns_paginated_payload_and_filter_params(client, use_s
 
 
 def test_get_segment_success_and_404(client, use_stub_connection_provider):
-    def handler(statement, params):
-        sql = str(statement).lower()
-        if "from council_speech_segments" in sql and "where id=:id" in sql and params["id"] == 1:
+    def handler(_statement, params):
+        if params["id"] == 1:
             return StubResult(
                 rows=[
                     {
@@ -320,7 +315,7 @@ def test_get_segment_success_and_404(client, use_stub_connection_provider):
                     }
                 ]
             )
-        if "from council_speech_segments" in sql and "where id=:id" in sql and params["id"] == 2:
+        if params["id"] == 2:
             return StubResult(rows=[])
         return StubResult()
 
@@ -336,11 +331,10 @@ def test_get_segment_success_and_404(client, use_stub_connection_provider):
 
 
 def test_delete_segment_success_and_not_found(client, use_stub_connection_provider):
-    def handler(statement, params):
-        sql = str(statement).lower()
-        if "delete from council_speech_segments" in sql and params["id"] == 1:
+    def handler(_statement, params):
+        if params["id"] == 1:
             return StubResult(rowcount=1)
-        if "delete from council_speech_segments" in sql and params["id"] == 2:
+        if params["id"] == 2:
             return StubResult(rowcount=0)
         return StubResult()
 

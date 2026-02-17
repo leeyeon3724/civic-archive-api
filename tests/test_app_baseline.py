@@ -91,11 +91,8 @@ def test_normalize_segment_validates_importance(segments_module):
 
 
 def test_upsert_articles_counts_insert_and_update(news_module, make_connection_provider):
-    def handler(statement, _params):
-        sql = str(statement).lower()
-        if "insert into news_articles" in sql:
-            return StubResult(rows=[{"inserted": 2, "updated": 1}])
-        return StubResult()
+    def handler(_statement, _params):
+        return StubResult(rows=[{"inserted": 2, "updated": 1}])
 
     connection_provider, _ = make_connection_provider(handler)
 
@@ -196,11 +193,11 @@ def test_save_segments_requires_json(client):
 
 
 def test_list_news_returns_paginated_payload(client, use_stub_connection_provider):
-    def handler(statement, _params):
-        sql = str(statement).lower()
-        if "select count(*) as total" in sql:
-            return StubResult(scalar_value=1)
-        if "from news_articles" in sql:
+    call_state = {"calls": 0}
+
+    def handler(_statement, _params):
+        if call_state["calls"] == 0:
+            call_state["calls"] += 1
             return StubResult(
                 rows=[
                     {
@@ -217,7 +214,7 @@ def test_list_news_returns_paginated_payload(client, use_stub_connection_provide
                     }
                 ]
             )
-        return StubResult()
+        return StubResult(scalar_value=1)
 
     engine = use_stub_connection_provider(handler)
 
@@ -238,11 +235,8 @@ def test_list_news_returns_paginated_payload(client, use_stub_connection_provide
 
 
 def test_get_news_404_when_not_found(client, use_stub_connection_provider):
-    def handler(statement, _params):
-        sql = str(statement).lower()
-        if "from news_articles where id=:id" in sql:
-            return StubResult(rows=[])
-        return StubResult()
+    def handler(_statement, _params):
+        return StubResult(rows=[])
 
     use_stub_connection_provider(handler)
 
@@ -252,11 +246,10 @@ def test_get_news_404_when_not_found(client, use_stub_connection_provider):
 
 
 def test_delete_news_success_and_not_found(client, use_stub_connection_provider):
-    def handler(statement, params):
-        sql = str(statement).lower()
-        if "delete from news_articles" in sql and params["id"] == 1:
+    def handler(_statement, params):
+        if params["id"] == 1:
             return StubResult(rowcount=1)
-        if "delete from news_articles" in sql and params["id"] == 2:
+        if params["id"] == 2:
             return StubResult(rowcount=0)
         return StubResult()
 
