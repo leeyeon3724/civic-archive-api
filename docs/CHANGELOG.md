@@ -1,32 +1,34 @@
-# Changelog
+# 변경 이력
 
-All notable changes to this project are documented in this file.
-
-The format is based on Keep a Changelog and this project follows Semantic Versioning.
+Keep a Changelog 형식 기반. Semantic Versioning 준수.
 
 ## [Unreleased]
 
-### Added
-- Typed DTO boundary module for service/repository contracts (`app/ports/dto.py`).
-- Production compose baseline (`docker-compose.prod.yml`) with strict security defaults.
-- Search strategy split (trigram + FTS) and related index design for list endpoints.
+### 추가
+- 계층 경계용 TypedDict DTO 모듈 (`app/ports/dto.py`).
+- 운영 보안 기본값 Docker Compose (`docker-compose.prod.yml`).
+- 검색 전략 분리: trigram(`ILIKE`+`pg_trgm`) + FTS(`to_tsvector/websearch_to_tsquery`) + GIN 인덱스.
+- 시작 시 불변 보안 검증: strict mode + memory backend 조합 차단, 인증 미설정 경고, 기본 DB 패스워드 감지(P11-1/2/6).
+- 레거시 dedupe 해시 관측성: `civic_archive_segment_legacy_hash_variant_total` Prometheus 카운터(P11-4).
 
-### Changed
-- Security module decomposition into focused modules:
-  `security_jwt.py`, `security_rate_limit.py`, `security_proxy.py`, `security_dependencies.py`.
-- `published_at` storage and parsing policy aligned to UTC-aware semantics (`TIMESTAMPTZ` + UTC normalization).
-- Route docs gate upgraded to router auto-discovery (`scripts/check_docs_routes.py`).
-- Repository/service interfaces migrated from broad `dict[str, Any]` contracts to typed DTO contracts.
+### 변경
+- 보안 모듈 분리: `security_jwt.py`, `security_rate_limit.py`, `security_proxy.py`, `security_dependencies.py`.
+- `published_at`: UTC-aware 저장 정책(`TIMESTAMPTZ` + UTC 정규화).
+- 라우트 문서 게이트: 라우터 자동 탐색 방식으로 전환 (`scripts/check_docs_routes.py`).
+- repository/service 포트: `dict[str, Any]` → TypedDict DTO 계약으로 전환.
+- `list_*` 필터 팬아웃 제거: route → service → repository 전 계층 query TypedDict 단일화(P11-3).
 
-### Fixed
-- Tests decoupled from SQL rendering text shape where not contractually required.
-- JWT secret minimum length enforcement under strict/required JWT paths.
+### 제거
+- `JWT_ALGORITHM` 설정 필드 제거 — HS256 하드코딩으로 알고리즘 혼동 공격 방지(P11-5).
+
+### 수정
+- 테스트: SQL 렌더링 텍스트 의존 제거, 동작 중심 어서션으로 전환.
+- JWT secret 최소 길이 검증 강화 (strict/REQUIRE_JWT 경로).
 
 ## [0.1.0] - 2026-02-17
 
-### Added
-- Initial FastAPI + PostgreSQL API release.
-- Domain APIs for news, council minutes, and speech segments (ingest/list/detail/delete).
-- Alembic migration workflow and CI quality/policy gates.
-- Standardized error schema and request-id based observability.
-
+### 추가
+- FastAPI + PostgreSQL 초기 릴리스.
+- 뉴스, 의회 회의록, 발언 단락 도메인 API (수집/목록/상세/삭제).
+- Alembic 마이그레이션 워크플로우 및 CI 품질/정책 게이트.
+- 표준 에러 스키마 및 request-id 기반 관측성.

@@ -60,7 +60,6 @@ Copy-Item .env.example .env
 | `API_KEY` | `` | API 키 값 (`REQUIRE_API_KEY=1`일 때 필수) |
 | `REQUIRE_JWT` | `0` | `1`이면 `/api/*` 엔드포인트에 `Authorization: Bearer <JWT>` 필수 |
 | `JWT_SECRET` | `` | JWT HMAC secret (`REQUIRE_JWT=1`일 때 필수, 최소 32 bytes) |
-| `JWT_ALGORITHM` | `HS256` | 현재 `HS256`만 지원 |
 | `JWT_LEEWAY_SECONDS` | `0` | JWT 시간 기반 클레임(`exp`/`nbf`) 허용 오차(초) |
 | `JWT_AUDIENCE` | `` | 지정 시 `aud` 클레임 검증 |
 | `JWT_ISSUER` | `` | 지정 시 `iss` 클레임 검증 |

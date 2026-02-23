@@ -1,82 +1,58 @@
-# SLO Policy
+# SLO 정책
 
-This document defines service-level indicators (SLI), objectives (SLO), error budget policy, and alert policy for `civic-archive-api`.
+서비스: `civic-archive-api` / 환경: `APP_ENV=production` / 대상: `/api/*`
+관측 소스: Prometheus 메트릭 (`civic_archive_http_requests_total`, `civic_archive_http_request_duration_seconds`)
 
-## Scope
+## SLI 정의
 
-- Service: `civic-archive-api`
-- Environment: production (`APP_ENV=production`)
-- Request scope: `/api/*` endpoints
-- Observation source: Prometheus metrics (`civic_archive_http_requests_total`, `civic_archive_http_request_duration_seconds`)
+| 지표 | 정의 | 수식 |
+|------|------|------|
+| 가용성 | `/api/*` 성공 요청 비율 (HTTP < 500) | `1 - (5xx / total)` |
+| 지연 | `/api/*` p95 응답 시간 | `histogram_quantile(0.95, ...)` |
 
-## SLI Definitions
+## SLO 목표
 
-### Availability SLI
+| 항목 | 목표 |
+|------|------|
+| 가용성 (30일 롤링) | ≥ 99.9% |
+| 지연 (5분 윈도우 p95) | ≤ 250ms |
+| Readiness | `/health/live` = 200, `/health/ready` = 200 |
 
-- Definition: ratio of successful requests over total requests for `/api/*`
-- Success: HTTP status code `< 500`
-- Formula:
-  - `availability = 1 - (5xx_requests / total_requests)`
+## 에러 버짓 정책
 
-### Latency SLI
+가용성 99.9% 기준 월 에러 버짓: **약 43분 12초 / 30일**
 
-- Definition: p95 request latency for `/api/*`
-- Source: `civic_archive_http_request_duration_seconds` histogram
-- Formula:
-  - `histogram_quantile(0.95, sum(rate(civic_archive_http_request_duration_seconds_bucket{path=~"/api/.*"}[5m])) by (le))`
+| 조건 | 조치 |
+|------|------|
+| 2시간 소진 > 10% | 즉시 온콜 호출, 비필수 배포 중단 |
+| 24시간 소진 > 25% | 기능 배포 전 인시던트 리뷰 필수 |
+| 30일 소진 > 50% | 비필수 변경 릴리즈 중단 |
+| 30일 소진 > 80% | 인시던트·보안·안정성 변경만 허용 |
 
-## SLO Targets
+## 알림 정책
 
-- Availability SLO (30-day rolling): `>= 99.9%`
-- Latency SLO (5m window p95): `<= 250ms`
-- Readiness SLO:
-  - `/health/live` = `200`
-  - `/health/ready` = `200`
+| 우선순위 | 조건 |
+|----------|------|
+| Page (긴급) | 5xx 비율 > 5% (5분) / p95 > 500ms (10분) / `/health/ready` ≠ 200 (3회 연속) |
+| Warning | 5xx 비율 > 1% (15분) / p95 > 300ms (15분) / 24시간 에러 버짓 소진 > 25% |
 
-## Error Budget Policy
+## 배포 전 체크리스트
 
-- Availability SLO 99.9% yields monthly error budget:
-  - ~43m 12s per 30 days
+```bash
+# 1. 품질 게이트
+python -m ruff check app tests scripts
+python -m pytest -q -m "not e2e and not integration" --cov=app --cov-report=term --cov-fail-under=85
+python scripts/check_docs_routes.py && python scripts/check_schema_policy.py
+python scripts/check_version_consistency.py && python scripts/check_slo_policy.py
 
-Burn policy:
+# 2. DB 마이그레이션
+python -m alembic upgrade head
 
-- 2-hour burn > 10% budget: page on-call immediately, stop non-critical deploys
-- 24-hour burn > 25% budget: require incident review before feature rollout
-- 30-day burn > 50% budget: reliability freeze for non-critical changes
-- 30-day burn > 80% budget: only incident, security, and reliability changes allowed
+# 3. 런타임 헬스 확인
+python scripts/check_runtime_health.py --base-url <target>
 
-## Alert Policy
+# 4. 성능 회귀 확인
+BENCH_PROFILE=staging BENCH_FAIL_THRESHOLD_MS=250 BENCH_FAIL_P95_THRESHOLD_MS=400 python scripts/benchmark_queries.py
+```
 
-### Page Alerts (high urgency)
-
-- `5xx error ratio > 5%` for 5 minutes
-- `p95 latency > 500ms` for 10 minutes
-- `/health/ready != 200` for 3 consecutive checks
-
-### Warning Alerts (medium urgency)
-
-- `5xx error ratio > 1%` for 15 minutes
-- `p95 latency > 300ms` for 15 minutes
-- error budget burn > 25% in 24h
-
-## Deployment Guardrails
-
-Before deploying to production:
-
-1. Run quality gates:
-   - `python -m ruff check app tests scripts`
-   - `python -m pytest -q -m "not e2e and not integration" --cov=app --cov-report=term --cov-fail-under=85`
-   - `python scripts/check_docs_routes.py`
-   - `python scripts/check_schema_policy.py`
-   - `python scripts/check_version_consistency.py`
-   - `python scripts/check_slo_policy.py`
-2. Run DB migration check:
-   - `python -m alembic upgrade head`
-3. Run pre-deploy runtime checks (target environment):
-   - `python scripts/check_runtime_health.py --base-url <target-base-url>`
-4. Run benchmark regression checks:
-   - `BENCH_PROFILE=staging BENCH_FAIL_THRESHOLD_MS=250 BENCH_FAIL_P95_THRESHOLD_MS=400 python scripts/benchmark_queries.py`
-
-## Incident Handling Linkage
-
-- Incident response checklist and rollback guidance: `docs/OPERATIONS.md`
+인시던트 대응 및 롤백: `docs/OPERATIONS.md` 참고

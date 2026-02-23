@@ -1,84 +1,61 @@
-# Operations Runbook
+# 운영 런북
 
-## Objectives
+## 장애 심각도
 
-- Reduce mean time to detect (MTTD)
-- Reduce mean time to recover (MTTR)
-- Keep production changes within SLO/error budget policy
+| 등급 | 기준 |
+|------|------|
+| SEV-1 | 완전 서비스 불능 또는 데이터 무결성 위험 |
+| SEV-2 | 핵심 기능 주요 저하 |
+| SEV-3 | 일부 기능 저하 (우회 수단 존재) |
 
-## Severity Levels
+## 장애 대응 절차
 
-- SEV-1: complete outage or critical data integrity risk
-- SEV-2: major degradation affecting key workflows
-- SEV-3: partial degradation with workaround
+1. **트리아지**: 영향 범위 확인(`/api/*`, 특정 엔드포인트, 인증, DB, Redis), 시작 시각/버전 기록
+2. **안정화**
+   - 배포 진행 중이면 일시 중단 또는 롤백
+   - ingest 급증 시: `INGEST_MAX_BATCH_ITEMS`, `MAX_REQUEST_BODY_BYTES` 임시 축소
+3. **진단**
+   - 헬스 확인: `/health/live`, `/health/ready`
+   - 메트릭: 에러 비율, p95 지연, 요청량
+   - 로그: `X-Request-Id` 기준 추적
+4. **복구**: 수정 적용 또는 롤백 후 readiness/liveness 및 주요 API 경로 재확인
+5. **사후 조치**: 타임라인·원인·재발 방지 보고서 작성, SLO 에러 버짓 상태 업데이트
 
-## Incident Response Checklist
+## 롤백 전략
 
-1. Triage
-- Confirm impact scope (`/api/*`, specific endpoints, auth, DB, Redis)
-- Capture start time and affected versions
+- **애플리케이션**: 이전 정상 이미지/태그 재배포
+- **스키마**: `python -m alembic downgrade -1` (롤백 안전성 사전 확인 필수)
+- **설정**: 문제 원인이 설정 변경인 경우 환경 변수 우선 롤백
 
-2. Stabilize
-- If active rollout: pause or rollback deploy
-- If dependency issue: switch to degrade mode as documented
-- Protect database from overload (throttle or temporarily reduce write pressure)
-- For ingest surge: temporarily lower `INGEST_MAX_BATCH_ITEMS` and `MAX_REQUEST_BODY_BYTES` via config rollout
+## 운영 점검 명령
 
-3. Diagnose
-- Check health endpoints:
-  - `/health/live`
-  - `/health/ready`
-- Check metrics:
-  - request error ratio
-  - p95 latency
-  - request volume
-- Check logs using `X-Request-Id`
+품질/정책 검사:
 
-4. Recover
-- Apply fix or rollback
-- Verify readiness/liveness and key API paths
-- Confirm alerts resolved and traffic normalized
+```bash
+python -m ruff check app tests scripts
+python -m pytest -q -m "not e2e and not integration" --cov=app --cov-report=term --cov-fail-under=85
+python scripts/check_docs_routes.py
+python scripts/check_schema_policy.py
+python scripts/check_version_consistency.py
+python scripts/check_slo_policy.py
+```
 
-5. Post-Incident
-- Write incident report (timeline, root cause, preventive actions)
-- Update SLO/error budget status and backlog priorities
+런타임 검사:
 
-## Rollback Strategy
+```bash
+python scripts/check_runtime_health.py --base-url http://localhost:8000
+# oversized payload 가드 확인: 413 PAYLOAD_TOO_LARGE 응답 여부
+```
 
-- Application rollback:
-  - Redeploy previous known-good image/tag
-- Schema rollback:
-  - Only if migration is explicitly reversible and data-safe
-  - `python -m alembic downgrade -1`
-- Configuration rollback:
-  - Revert environment variable changes first when issue is config-induced
+운영 Compose 기동:
 
-## On-Call Operational Commands
+```bash
+docker compose -f docker-compose.prod.yml up -d --build
+# 필수 환경 변수: POSTGRES_PASSWORD, API_KEY, JWT_SECRET (최소 32 bytes)
+```
 
-Quality and policy checks:
+성능 회귀 확인:
 
-- `python -m ruff check app tests scripts`
-- `python -m pytest -q -m "not e2e and not integration" --cov=app --cov-report=term --cov-fail-under=85`
-- `python scripts/check_docs_routes.py`
-- `python scripts/check_schema_policy.py`
-- `python scripts/check_version_consistency.py`
-- `python scripts/check_slo_policy.py`
-
-Runtime checks:
-
-- `python scripts/check_runtime_health.py --base-url http://localhost:8000`
-- Verify oversized payload guard:
-  - confirm `413 PAYLOAD_TOO_LARGE` is returned for request size violations
-  - confirm batch ingest limit blocks oversized list payloads
-
-Production compose baseline:
-
-- `docker compose -f docker-compose.prod.yml up -d --build`
-- required secrets/env:
-  - `POSTGRES_PASSWORD`
-  - `API_KEY`
-  - `JWT_SECRET` (minimum 32 bytes)
-
-Performance regression:
-
-- `BENCH_PROFILE=staging BENCH_FAIL_THRESHOLD_MS=250 BENCH_FAIL_P95_THRESHOLD_MS=400 python scripts/benchmark_queries.py`
+```bash
+BENCH_PROFILE=staging BENCH_FAIL_THRESHOLD_MS=250 BENCH_FAIL_P95_THRESHOLD_MS=400 python scripts/benchmark_queries.py
+```
