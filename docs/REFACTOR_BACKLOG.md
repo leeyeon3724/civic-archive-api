@@ -480,3 +480,209 @@
 - Risks:
   - API-facing validation messages may change unexpectedly
   - phased migration complexity across routes/services/repositories
+
+---
+
+## P11 Backlog — Risk-Driven Hardening
+
+### Scope
+
+리스크 가중 기술 부채 분석 결과 도출된 항목.
+배포 모델(단일 서버 Docker Compose) 유지. 아키텍처 변경 없음.
+우선순위 기준: Impact × Likelihood 점수 (분석 보고서 기준).
+
+### Risk-Weighted Priority Matrix (P11 범위)
+
+| Ticket | Description                                              | Impact | Likelihood | Score  | Classification    |
+|--------|----------------------------------------------------------|--------|------------|--------|-------------------|
+| P11-1  | 메모리 레이트 리미터 다중 워커 안전성                    | 4      | 5          | **20** | Refactor Now      |
+| P11-2  | 보안 기본값 미설정 — 시작 시 불변 검증                   | 5      | 3          | **15** | Refactor Now      |
+| P11-3  | 필터 파라미터 팬아웃 제거 (segments/minutes/news)        | 3      | 5          | **15** | Refactor Now      |
+| P11-4  | 레거시 dedupe 해시 — 관측 가능성 및 폐기 경로            | 4      | 3          | **12** | Refactor Now      |
+| P11-5  | `JWT_ALGORITHM` 설정 필드 미사용 정리                    | 3      | 4          | **12** | Monitor / Cleanup |
+| P11-6  | 기본 DB 패스워드 시작 시 경고                            | 3      | 3          | **9**  | Monitor / Cleanup |
+| P11-7  | JSONB 필드 중첩 깊이 가드                                | 3      | 3          | **9**  | Deferred          |
+| P11-8  | COUNT(*) 페이지네이션 성능 모니터링 정책                 | 3      | 4          | **12** | Deferred          |
+
+---
+
+### Ticket P11-1: 메모리 레이트 리미터 다중 워커 안전성 (Score: 20)
+
+- Priority: P0
+- Status: Completed
+- 리스크 시나리오:
+  - `InMemoryRateLimiter`는 프로세스 로컬 `threading.Lock` 기반이므로 uvicorn `--workers N` 환경에서 각 워커가 독립적인 카운터를 보유함
+  - 결과: 실제 허용량이 `RATE_LIMIT_PER_MINUTE × N`이 되어 레이트 리미팅이 무력화됨
+  - 실패 모드: 헬스 체크와 단일 프로세스 테스트에서는 정상으로 보이지만 실제 운영 배포에서는 보호 효과 없음
+  - 근거 코드: `app/security_rate_limit.py:37–68`
+- Tasks:
+  - [ ] `app/bootstrap/validation.py`에 시작 시 검증 추가: `SECURITY_STRICT_MODE=True` AND `RATE_LIMIT_BACKEND=memory` AND `RATE_LIMIT_PER_MINUTE > 0` → `RuntimeError` 발생
+  - [ ] `RATE_LIMIT_BACKEND=memory` 선택 시 구조화 `WARNING` 로그 출력: 단일 워커 전용임을 명시
+  - [ ] `.env.example` 주석 보강: 다중 워커 환경에서는 반드시 `RATE_LIMIT_BACKEND=redis` 사용
+  - [ ] `docker-compose.prod.yml` 주석 보강: Redis 백엔드 선택 이유 명시
+  - [ ] 검증 경로에 대한 단위 테스트 추가 (strict mode + memory backend 조합)
+- Done Criteria:
+  - strict mode + memory backend 조합 시 시작 시 `RuntimeError` 발생
+  - 비 strict 환경에서 memory backend 선택 시 WARNING 로그 출력 (정상 가동)
+  - 단위/컨트랙트 테스트 통과
+  - 스키마 정책, 버전 일관성 검사 통과
+- Risks:
+  - 기존 단일 워커 개발 환경에는 영향 없음 (strict mode off)
+  - strict mode 배포 중 memory backend 사용 중인 경우: 의도된 breaking change — Redis 전환 필요
+
+---
+
+### Ticket P11-2: 보안 기본값 미설정 — 시작 시 불변 검증 (Score: 15)
+
+- Priority: P0
+- Status: Completed
+- 리스크 시나리오:
+  - `REQUIRE_API_KEY=False`, `REQUIRE_JWT=False`가 기본값이므로 환경 변수 누락 시 전체 API가 인증 없이 공개됨
+  - `SECURITY_STRICT_MODE` 미설정 시 strict mode가 `APP_ENV` 문자열 매칭 휴리스틱에 의존 (`{"prod", "production"}`만 인식)
+  - 결과: `APP_ENV=live`, `APP_ENV=prod-kr` 등의 값에서 strict mode 미활성화, 쓰기/삭제 엔드포인트 무인증 노출
+  - 근거 코드: `app/config.py:39–51`, `app/config.py:115–118`, `app/security_dependencies.py:15–21`
+- Tasks:
+  - [ ] `app/bootstrap/validation.py`에 시작 시 불변 조건 추가:
+    - `strict_security_mode=True` AND `REQUIRE_API_KEY=False` AND `REQUIRE_JWT=False` → `RuntimeError` (최소 하나의 인증 수단 필요)
+    - `strict_security_mode=True` AND `RATE_LIMIT_PER_MINUTE == 0` → `RuntimeError` (strict mode에서 레이트 리밋 필수)
+  - [ ] `APP_ENV != "development"` AND 인증 비활성화 상태에서 구조화 `WARNING` 로그 출력
+  - [ ] 각 불변 조건 경로에 대한 단위 테스트 추가
+  - [ ] `.env.example` 및 `docker-compose.prod.yml` 주석 보강: strict mode 체크리스트 명시
+- Done Criteria:
+  - 두 가지 불변 조건 각각에 대한 `RuntimeError` 검증 테스트 통과
+  - 비 strict 환경에서 인증 미설정 시 WARNING 로그 출력 (시작 차단 없음)
+  - 단위/컨트랙트 테스트, 스키마 정책, 버전 일관성 검사 통과
+- Risks:
+  - strict mode 하에 인증 없이 운영 중인 경우: 의도된 breaking change
+  - 검증 시점(시작 vs. 요청)에 따른 테스트 픽스처 조정 필요
+
+---
+
+### Ticket P11-3: 필터 파라미터 12개 팬아웃 제거 (Score: 15)
+
+- Priority: P1
+- Status: Completed
+- 리스크 시나리오:
+  - `list_segments` 파라미터 목록(q, council, committee, session, meeting_no, importance, party, constituency, department, date_from, date_to, page, size — 13개)이 route → service module function → service class method → repository module function → repository class method 총 5곳에 중복 정의됨
+  - 필터 하나 추가/삭제 시 최소 5개 파일, 8개 지점 수정 필요
+  - 실패 모드: 레이어 간 파라미터 부분 누락 시 Python 런타임 에러 또는 필터 무시 — 타입 검사 미통과 시 침묵적 결함
+  - 근거 코드: `app/repositories/segments_repository.py:151–263`, `app/repositories/segments_repository.py:309–341`, `app/services/segments_service.py:179–210`, `app/services/segments_service.py:242–275`, `app/routes/segments.py:60–97`
+- Tasks:
+  - [ ] `app/ports/dto.py`에 `SegmentsListQuery` TypedDict 정의 (모든 필터 파라미터 포함)
+  - [ ] `app/ports/dto.py`에 `MinutesListQuery` TypedDict 정의
+  - [ ] `app/ports/dto.py`에 `NewsListQuery` TypedDict 정의
+  - [ ] 각 레이어(route → service → repository)의 `list_*` 함수 시그니처를 단일 query object로 교체
+  - [ ] `app/ports/repositories.py`, `app/ports/services.py` Protocol 인터페이스 동기화
+  - [ ] API 라우트 `Query()` 파라미터는 변경 없음 — query object 생성은 route handler 내부에서만 수행
+  - [ ] 파라미터 전달 정확성 검증 회귀 테스트 추가
+- Done Criteria:
+  - API 계약 변경 없음 (라우트 시그니처 동일)
+  - `list_*` 함수 시그니처 중복 제거 (5곳 → query object 단일 정의)
+  - 필터 파라미터 전달 통합 테스트 통과
+  - mypy, ruff, 단위/컨트랙트 테스트 통과
+- Risks:
+  - 대규모 기계적 리팩터링으로 PR 리뷰 부담 증가 — 레이어별 단계적 적용 권장
+  - Protocol 구조적 타이핑 범위 확장으로 mypy 오류 일시 증가 가능
+
+---
+
+### Ticket P11-4: 레거시 dedupe 해시 — 관측 가능성 및 폐기 경로 (Score: 12)
+
+- Priority: P1
+- Status: Completed
+- 리스크 시나리오:
+  - `_build_legacy_segment_dedupe_hash`는 `None` 필드를 `""` 로 치환하여 현재 해시와 다른 값을 생성함
+  - `insert_segments` SQL의 `NOT EXISTS` 조건이 `s.dedupe_hash = p.dedupe_hash_legacy`도 검사하므로, 레거시 해시가 기존 레코드의 canonical 해시와 우연히 일치할 경우 유효한 새 레코드가 무경고로 드롭됨
+  - 폐기 타임라인이 정의되지 않아 레거시 경로가 무기한 유지될 위험 존재
+  - 근거 코드: `app/services/segments_service.py:55–86`, `app/repositories/segments_repository.py:128–135`
+- Tasks:
+  - [ ] Prometheus 카운터 추가: `legacy_hash_fallback_total` — `NOT EXISTS` 에서 canonical 해시가 아닌 legacy 해시로 매칭된 건수 계측
+  - [ ] 회귀 테스트 추가: `_build_segment_dedupe_hash(item_with_none_fields) != _build_legacy_segment_dedupe_hash(item_with_none_fields)` — 두 함수가 동일 입력에 대해 다른 해시를 생성함을 보장
+  - [ ] `CHANGELOG.md` 및 본 백로그에 폐기 타임라인 기록 (예: 레거시 해시 마지막 운영 사용일로부터 90일)
+  - [ ] 폐기 완료 후 실행할 Alembic 마이그레이션 계획 수립: `dedupe_hash_legacy` 컬럼 DROP, `SegmentUpsertDTO`에서 해당 필드 제거, SQL `NOT EXISTS` 분기 단순화
+- Done Criteria:
+  - `legacy_hash_fallback_total` 메트릭이 readiness probe 와 별개로 `/metrics` 에서 노출됨
+  - 두 해시 함수 불일치 보장 테스트 통과
+  - 폐기 타임라인이 문서화됨
+  - 단위/컨트랙트 테스트, 메트릭 카디널리티 테스트 통과
+- Risks:
+  - 메트릭 추가 자체는 zero-risk
+  - 컬럼 DROP 마이그레이션은 파이프라인이 레거시 해시를 더 이상 생성하지 않음을 운영에서 확인한 후 별도 PR로 진행
+
+---
+
+### Ticket P11-5: `JWT_ALGORITHM` 설정 필드 미사용 정리 (Score: 12)
+
+- Priority: P2
+- Status: Completed
+- 리스크 시나리오:
+  - `app/config.py:43`의 `JWT_ALGORITHM: str = "HS256"` 설정이 정의되어 있으나 `app/security_jwt.py:58`에서 알고리즘 목록이 `["HS256"]`로 하드코딩됨
+  - 운영자가 `JWT_ALGORITHM=RS256` 설정 시 실제 적용되지 않고 여전히 HS256으로 검증됨 — 침묵적 잘못된 설정
+  - 근거 코드: `app/config.py:43`, `app/security_jwt.py:58–66`
+- Tasks:
+  - [ ] `app/config.py`에서 `JWT_ALGORITHM` 필드 제거
+  - [ ] `.env.example`에서 `JWT_ALGORITHM` 항목 제거
+  - [ ] `app/security_jwt.py`의 `validate_jwt_hs256` 함수에 알고리즘 하드코딩 이유 주석 추가: 알고리즘 혼동 공격(`alg:none`, RS256→HS256 다운그레이드) 방지
+  - [ ] `app/bootstrap/validation.py`의 JWT 관련 시작 검증에서 알고리즘 설정 참조 코드가 있다면 제거
+  - [ ] 설정 변경에 대한 회귀 테스트 추가 (필드 부재 시 정상 동작 확인)
+- Done Criteria:
+  - `JWT_ALGORITHM` 설정 필드가 코드베이스에서 완전 제거됨
+  - 기존 JWT 인증 회귀 테스트 전부 통과
+  - ruff, mypy 통과
+- Risks:
+  - `.env` 파일에 `JWT_ALGORITHM` 설정 중인 운영 환경은 무시되는 값이 제거됨 (동작 영향 없음)
+
+---
+
+### Ticket P11-6: 기본 DB 패스워드 시작 시 경고 (Score: 9)
+
+- Priority: P2
+- Status: Completed
+- 리스크 시나리오:
+  - `app/config.py:21`의 `POSTGRES_PASSWORD: str = "change_me"` 기본값이 환경 변수 미설정 시 그대로 사용됨
+  - 개발 DB가 기본 패스워드로 생성되어 있다면 환경 변수 없이 연결이 성공하여 미설정 상태를 침묵적으로 마스킹
+  - 근거 코드: `app/config.py:21`
+- Tasks:
+  - [ ] `app/bootstrap/validation.py`에 시작 시 조건 추가: `POSTGRES_PASSWORD == "change_me"` AND `APP_ENV != "development"` → 구조화 `WARNING` 로그 출력 (`level=WARNING`, `event=default_db_password_detected`)
+  - [ ] strict mode에서는 WARNING이 아닌 `RuntimeError`로 상향 (운영자가 명시적으로 변경 강제)
+  - [ ] 해당 경고/에러 경로에 대한 단위 테스트 추가
+- Done Criteria:
+  - 비 development 환경에서 기본 패스워드 사용 시 WARNING 로그 출력
+  - strict mode에서 기본 패스워드 사용 시 `RuntimeError` 발생으로 시작 차단
+  - 단위 테스트, ruff, mypy 통과
+- Risks:
+  - 영향 없음 (경고만 출력, 동작 변경 없음) — strict mode 제외
+
+---
+
+### Deferred: JSONB 필드 중첩 깊이 가드 (R9, Score: 9)
+
+- 대상 필드: `tag`, `moderator`, `questioner`, `answerer` (`Any` 타입, 스키마 검증 없음)
+- 리스크: 1000단계 이상 중첩 JSON 입력 시 `_canonical_json_value` 재귀 함수에서 Python `RecursionError` 발생 가능
+- 현재 완화 수단: `MAX_REQUEST_BODY_BYTES=1MB` 스트리밍 가드가 일정 수준의 보호 제공
+- 조건: 알려진 ETL 파이프라인 외부 소스가 추가되거나 API가 공개 쓰기 엔드포인트로 전환되는 시점에 `_canonical_json_value` 내 `max_depth` 가드 구현 검토
+
+---
+
+### Deferred: COUNT(*) 페이지네이션 성능 모니터링 정책 (R8, Score: 12)
+
+- 현황: 모든 목록 엔드포인트가 데이터 쿼리 + 전체 카운트 쿼리 2회 실행 (`app/repositories/common.py:44–52`)
+- 리스크: `council_speech_segments` 테이블이 50만 행 이상에서 복합 WHERE 조건의 `COUNT(*)` 지연 비선형 증가
+- 조치 기준:
+  - 세그먼트 테이블 행 수 > 500,000 또는 `check_slo_policy.py` SLO 기준 위반 발생 시 커서 기반 페이지네이션(keyset pagination) 도입 검토
+  - `docs/PERFORMANCE.md`에 현재 이중 쿼리 구조의 제약 조건과 확장 임계값 문서화
+  - `docs/OPERATIONS.md` 운영 체크리스트에 테이블 행 수 모니터링 항목 추가
+
+---
+
+## Definition of Done (P11)
+
+- 단위/컨트랙트 테스트 통과
+- 통합 테스트 통과 (`RUN_INTEGRATION=1`)
+- Docs-route 계약 검사 통과
+- 스키마 정책 검사 통과
+- 버전 일관성 검사 통과
+- SLO 정책 검사 통과
+- lint 게이트 (`ruff`) 통과
+- 커버리지 게이트 (`--cov-fail-under`) 통과
+- `docs/CHANGELOG.md` 업데이트
