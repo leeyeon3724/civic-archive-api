@@ -58,6 +58,9 @@ def validate_jwt_hs256(token: str, config: Any) -> dict[str, Any]:
         payload = jwt.decode(
             token,
             key=secret,
+            # HS256 is intentionally hardcoded — accepting a configurable algorithm list
+            # would enable algorithm-confusion attacks (e.g. alg:none or RS256→HS256
+            # downgrade). Only symmetric HMAC-SHA256 is supported.
             algorithms=["HS256"],
             options=options,
             audience=audience,

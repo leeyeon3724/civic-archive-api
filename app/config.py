@@ -40,7 +40,6 @@ class Config(BaseSettings):
     API_KEY: str | None = None
     REQUIRE_JWT: bool = False
     JWT_SECRET: str | None = None
-    JWT_ALGORITHM: str = "HS256"
     JWT_LEEWAY_SECONDS: int = 0
     JWT_AUDIENCE: str | None = None
     JWT_ISSUER: str | None = None
