@@ -3,7 +3,7 @@ from datetime import date
 from fastapi import APIRouter, Body, Depends, Query, Request
 
 from app.errors import http_error
-from app.ports.dto import MinutesUpsertDTO
+from app.ports.dto import MinutesListQuery, MinutesUpsertDTO
 from app.ports.services import MinutesServicePort
 from app.routes.common import ERROR_RESPONSES, enforce_ingest_batch_limit
 from app.schemas import (
@@ -68,17 +68,18 @@ def list_minutes(
     date_to: date | None = Query(default=None, alias="to"),
     service: MinutesServicePort = Depends(get_minutes_service),
 ) -> MinutesListResponse:
-    rows, total = service.list_minutes(
-        q=q,
-        council=council,
-        committee=committee,
-        session=session,
-        meeting_no=meeting_no,
-        date_from=date_from.isoformat() if date_from else None,
-        date_to=date_to.isoformat() if date_to else None,
-        page=page,
-        size=size,
-    )
+    query: MinutesListQuery = {
+        "page": page,
+        "size": size,
+        "q": q,
+        "council": council,
+        "committee": committee,
+        "session": session,
+        "meeting_no": meeting_no,
+        "date_from": date_from.isoformat() if date_from else None,
+        "date_to": date_to.isoformat() if date_to else None,
+    }
+    rows, total = service.list_minutes(query)
 
     return MinutesListResponse(
         page=page,

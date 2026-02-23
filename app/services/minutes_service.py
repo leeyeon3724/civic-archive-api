@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import cast
 
-from app.ports.dto import MinutesRecordDTO, MinutesUpsertDTO
+from app.ports.dto import MinutesListQuery, MinutesRecordDTO, MinutesUpsertDTO
 from app.ports.repositories import MinutesRepositoryPort
 from app.ports.services import MinutesServicePort
 from app.repositories.minutes_repository import MinutesRepository
@@ -67,30 +67,8 @@ class MinutesService:
     def upsert_minutes(self, items: list[MinutesUpsertDTO]) -> tuple[int, int]:
         return self._repository.upsert_minutes(items)
 
-    def list_minutes(
-        self,
-        *,
-        q: str | None,
-        council: str | None,
-        committee: str | None,
-        session: str | None,
-        meeting_no: str | None,
-        date_from: str | None,
-        date_to: str | None,
-        page: int,
-        size: int,
-    ) -> tuple[list[MinutesRecordDTO], int]:
-        return self._repository.list_minutes(
-            q=q,
-            council=council,
-            committee=committee,
-            session=session,
-            meeting_no=meeting_no,
-            date_from=date_from,
-            date_to=date_to,
-            page=page,
-            size=size,
-        )
+    def list_minutes(self, query: MinutesListQuery) -> tuple[list[MinutesRecordDTO], int]:
+        return self._repository.list_minutes(query)
 
     def get_minutes(self, item_id: int) -> MinutesRecordDTO | None:
         return self._repository.get_minutes(item_id)
@@ -123,31 +101,13 @@ def upsert_minutes(
 
 
 def list_minutes(
+    query: MinutesListQuery,
     *,
-    q: str | None,
-    council: str | None,
-    committee: str | None,
-    session: str | None,
-    meeting_no: str | None,
-    date_from: str | None,
-    date_to: str | None,
-    page: int,
-    size: int,
     service: MinutesServicePort | None = None,
     connection_provider: ConnectionProvider | None = None,
 ) -> tuple[list[MinutesRecordDTO], int]:
     active_service = service or build_minutes_service(connection_provider=ensure_connection_provider(connection_provider))
-    return active_service.list_minutes(
-        q=q,
-        council=council,
-        committee=committee,
-        session=session,
-        meeting_no=meeting_no,
-        date_from=date_from,
-        date_to=date_to,
-        page=page,
-        size=size,
-    )
+    return active_service.list_minutes(query)
 
 
 def get_minutes(

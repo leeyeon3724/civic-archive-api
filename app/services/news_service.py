@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import cast
 
-from app.ports.dto import NewsArticleRecordDTO, NewsArticleUpsertDTO
+from app.ports.dto import NewsArticleRecordDTO, NewsArticleUpsertDTO, NewsListQuery
 from app.ports.repositories import NewsRepositoryPort
 from app.ports.services import NewsServicePort
 from app.repositories.news_repository import NewsRepository
@@ -58,24 +58,8 @@ class NewsService:
     def upsert_articles(self, items: list[NewsArticleUpsertDTO]) -> tuple[int, int]:
         return self._repository.upsert_articles(items)
 
-    def list_articles(
-        self,
-        *,
-        q: str | None,
-        source: str | None,
-        date_from: str | None,
-        date_to: str | None,
-        page: int,
-        size: int,
-    ) -> tuple[list[NewsArticleRecordDTO], int]:
-        return self._repository.list_articles(
-            q=q,
-            source=source,
-            date_from=date_from,
-            date_to=date_to,
-            page=page,
-            size=size,
-        )
+    def list_articles(self, query: NewsListQuery) -> tuple[list[NewsArticleRecordDTO], int]:
+        return self._repository.list_articles(query)
 
     def get_article(self, item_id: int) -> NewsArticleRecordDTO | None:
         return self._repository.get_article(item_id)
@@ -108,25 +92,13 @@ def upsert_articles(
 
 
 def list_articles(
+    query: NewsListQuery,
     *,
-    q: str | None,
-    source: str | None,
-    date_from: str | None,
-    date_to: str | None,
-    page: int,
-    size: int,
     service: NewsServicePort | None = None,
     connection_provider: ConnectionProvider | None = None,
 ) -> tuple[list[NewsArticleRecordDTO], int]:
     active_service = service or build_news_service(connection_provider=ensure_connection_provider(connection_provider))
-    return active_service.list_articles(
-        q=q,
-        source=source,
-        date_from=date_from,
-        date_to=date_to,
-        page=page,
-        size=size,
-    )
+    return active_service.list_articles(query)
 
 
 def get_article(

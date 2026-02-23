@@ -3,7 +3,7 @@ from datetime import date
 from fastapi import APIRouter, Body, Depends, Query, Request
 
 from app.errors import http_error
-from app.ports.dto import NewsArticleUpsertDTO
+from app.ports.dto import NewsArticleUpsertDTO, NewsListQuery
 from app.ports.services import NewsServicePort
 from app.routes.common import ERROR_RESPONSES, enforce_ingest_batch_limit
 from app.schemas import (
@@ -75,14 +75,15 @@ def list_news(
     date_to: date | None = Query(default=None, alias="to"),
     service: NewsServicePort = Depends(get_news_service),
 ) -> NewsListResponse:
-    rows, total = service.list_articles(
-        q=q,
-        source=source,
-        date_from=date_from.isoformat() if date_from else None,
-        date_to=date_to.isoformat() if date_to else None,
-        page=page,
-        size=size,
-    )
+    query: NewsListQuery = {
+        "page": page,
+        "size": size,
+        "q": q,
+        "source": source,
+        "date_from": date_from.isoformat() if date_from else None,
+        "date_to": date_to.isoformat() if date_to else None,
+    }
+    rows, total = service.list_articles(query)
 
     return NewsListResponse(page=page, size=size, total=total, items=[NewsItemBase.model_validate(row) for row in rows])
 

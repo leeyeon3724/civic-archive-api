@@ -3,7 +3,7 @@ from datetime import date
 from fastapi import APIRouter, Body, Depends, Query, Request
 
 from app.errors import http_error
-from app.ports.dto import SegmentUpsertDTO
+from app.ports.dto import SegmentsListQuery, SegmentUpsertDTO
 from app.ports.services import SegmentsServicePort
 from app.routes.common import ERROR_RESPONSES, enforce_ingest_batch_limit
 from app.schemas import (
@@ -73,21 +73,22 @@ def list_segments(
     date_to: date | None = Query(default=None, alias="to"),
     service: SegmentsServicePort = Depends(get_segments_service),
 ) -> SegmentsListResponse:
-    rows, total = service.list_segments(
-        q=q,
-        council=council,
-        committee=committee,
-        session=session,
-        meeting_no=meeting_no,
-        importance=importance,
-        party=party,
-        constituency=constituency,
-        department=department,
-        date_from=date_from.isoformat() if date_from else None,
-        date_to=date_to.isoformat() if date_to else None,
-        page=page,
-        size=size,
-    )
+    query: SegmentsListQuery = {
+        "page": page,
+        "size": size,
+        "q": q,
+        "council": council,
+        "committee": committee,
+        "session": session,
+        "meeting_no": meeting_no,
+        "importance": importance,
+        "party": party,
+        "constituency": constituency,
+        "department": department,
+        "date_from": date_from.isoformat() if date_from else None,
+        "date_to": date_to.isoformat() if date_to else None,
+    }
+    rows, total = service.list_segments(query)
 
     return SegmentsListResponse(
         page=page,

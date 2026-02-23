@@ -4,7 +4,7 @@ from typing import Any, cast as typing_cast
 
 from sqlalchemy import Date, bindparam, cast, column, func, select, table, text
 
-from app.ports.dto import NewsArticleRecordDTO, NewsArticleUpsertDTO
+from app.ports.dto import NewsArticleRecordDTO, NewsArticleUpsertDTO, NewsListQuery
 from app.repositories.common import dedupe_rows_by_key, execute_filtered_paginated_query, to_json_recordset
 from app.repositories.search import build_split_search_condition, build_split_search_params
 from app.repositories.session_provider import ConnectionProvider, open_connection_scope
@@ -95,15 +95,17 @@ def upsert_articles(
 
 
 def list_articles(
+    query: NewsListQuery,
     *,
-    q: str | None,
-    source: str | None,
-    date_from: str | None,
-    date_to: str | None,
-    page: int,
-    size: int,
     connection_provider: ConnectionProvider,
 ) -> tuple[list[NewsArticleRecordDTO], int]:
+    q = query.get("q")
+    source = query.get("source")
+    date_from = query.get("date_from")
+    date_to = query.get("date_to")
+    page = query["page"]
+    size = query["size"]
+
     conditions = []
     params: dict[str, Any] = {}
 
@@ -204,25 +206,8 @@ class NewsRepository:
     def upsert_articles(self, articles: list[NewsArticleUpsertDTO]) -> tuple[int, int]:
         return upsert_articles(articles, connection_provider=self._connection_provider)
 
-    def list_articles(
-        self,
-        *,
-        q: str | None,
-        source: str | None,
-        date_from: str | None,
-        date_to: str | None,
-        page: int,
-        size: int,
-    ) -> tuple[list[NewsArticleRecordDTO], int]:
-        return list_articles(
-            q=q,
-            source=source,
-            date_from=date_from,
-            date_to=date_to,
-            page=page,
-            size=size,
-            connection_provider=self._connection_provider,
-        )
+    def list_articles(self, query: NewsListQuery) -> tuple[list[NewsArticleRecordDTO], int]:
+        return list_articles(query, connection_provider=self._connection_provider)
 
     def get_article(self, item_id: int) -> NewsArticleRecordDTO | None:
         return get_article(item_id, connection_provider=self._connection_provider)

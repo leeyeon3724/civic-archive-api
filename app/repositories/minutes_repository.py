@@ -4,7 +4,7 @@ from typing import Any, cast as typing_cast
 
 from sqlalchemy import bindparam, column, func, select, table, text
 
-from app.ports.dto import MinutesRecordDTO, MinutesUpsertDTO
+from app.ports.dto import MinutesListQuery, MinutesRecordDTO, MinutesUpsertDTO
 from app.repositories.common import (
     add_truthy_equals_filter,
     dedupe_rows_by_key,
@@ -122,18 +122,20 @@ def upsert_minutes(
 
 
 def list_minutes(
+    query: MinutesListQuery,
     *,
-    q: str | None,
-    council: str | None,
-    committee: str | None,
-    session: str | None,
-    meeting_no: str | None,
-    date_from: str | None,
-    date_to: str | None,
-    page: int,
-    size: int,
     connection_provider: ConnectionProvider,
 ) -> tuple[list[MinutesRecordDTO], int]:
+    q = query.get("q")
+    council = query.get("council")
+    committee = query.get("committee")
+    session = query.get("session")
+    meeting_no = query.get("meeting_no")
+    date_from = query.get("date_from")
+    date_to = query.get("date_to")
+    page = query["page"]
+    size = query["size"]
+
     conditions = []
     params: dict[str, Any] = {}
 
@@ -249,31 +251,8 @@ class MinutesRepository:
     def upsert_minutes(self, items: list[MinutesUpsertDTO]) -> tuple[int, int]:
         return upsert_minutes(items, connection_provider=self._connection_provider)
 
-    def list_minutes(
-        self,
-        *,
-        q: str | None,
-        council: str | None,
-        committee: str | None,
-        session: str | None,
-        meeting_no: str | None,
-        date_from: str | None,
-        date_to: str | None,
-        page: int,
-        size: int,
-    ) -> tuple[list[MinutesRecordDTO], int]:
-        return list_minutes(
-            q=q,
-            council=council,
-            committee=committee,
-            session=session,
-            meeting_no=meeting_no,
-            date_from=date_from,
-            date_to=date_to,
-            page=page,
-            size=size,
-            connection_provider=self._connection_provider,
-        )
+    def list_minutes(self, query: MinutesListQuery) -> tuple[list[MinutesRecordDTO], int]:
+        return list_minutes(query, connection_provider=self._connection_provider)
 
     def get_minutes(self, item_id: int) -> MinutesRecordDTO | None:
         return get_minutes(item_id, connection_provider=self._connection_provider)

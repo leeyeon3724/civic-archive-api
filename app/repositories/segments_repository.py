@@ -4,7 +4,7 @@ from typing import Any, cast as typing_cast
 
 from sqlalchemy import bindparam, column, func, select, table, text
 
-from app.ports.dto import SegmentRecordDTO, SegmentUpsertDTO
+from app.ports.dto import SegmentRecordDTO, SegmentsListQuery, SegmentUpsertDTO
 from app.repositories.common import (
     add_not_none_equals_filter,
     add_truthy_equals_filter,
@@ -149,22 +149,24 @@ def insert_segments(
 
 
 def list_segments(
+    query: SegmentsListQuery,
     *,
-    q: str | None,
-    council: str | None,
-    committee: str | None,
-    session: str | None,
-    meeting_no: str | None,
-    importance: int | None,
-    party: str | None,
-    constituency: str | None,
-    department: str | None,
-    date_from: str | None,
-    date_to: str | None,
-    page: int,
-    size: int,
     connection_provider: ConnectionProvider,
 ) -> tuple[list[SegmentRecordDTO], int]:
+    q = query.get("q")
+    council = query.get("council")
+    committee = query.get("committee")
+    session = query.get("session")
+    meeting_no = query.get("meeting_no")
+    importance = query.get("importance")
+    party = query.get("party")
+    constituency = query.get("constituency")
+    department = query.get("department")
+    date_from = query.get("date_from")
+    date_to = query.get("date_to")
+    page = query["page"]
+    size = query["size"]
+
     conditions = []
     params: dict[str, Any] = {}
 
@@ -306,39 +308,8 @@ class SegmentsRepository:
     def insert_segments(self, items: list[SegmentUpsertDTO]) -> int:
         return insert_segments(items, connection_provider=self._connection_provider)
 
-    def list_segments(
-        self,
-        *,
-        q: str | None,
-        council: str | None,
-        committee: str | None,
-        session: str | None,
-        meeting_no: str | None,
-        importance: int | None,
-        party: str | None,
-        constituency: str | None,
-        department: str | None,
-        date_from: str | None,
-        date_to: str | None,
-        page: int,
-        size: int,
-    ) -> tuple[list[SegmentRecordDTO], int]:
-        return list_segments(
-            q=q,
-            council=council,
-            committee=committee,
-            session=session,
-            meeting_no=meeting_no,
-            importance=importance,
-            party=party,
-            constituency=constituency,
-            department=department,
-            date_from=date_from,
-            date_to=date_to,
-            page=page,
-            size=size,
-            connection_provider=self._connection_provider,
-        )
+    def list_segments(self, query: SegmentsListQuery) -> tuple[list[SegmentRecordDTO], int]:
+        return list_segments(query, connection_provider=self._connection_provider)
 
     def get_segment(self, item_id: int) -> SegmentRecordDTO | None:
         return get_segment(item_id, connection_provider=self._connection_provider)
