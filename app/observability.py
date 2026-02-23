@@ -21,6 +21,12 @@ REQUEST_LATENCY = Histogram(
     "HTTP request latency (seconds)",
     ["method", "path"],
 )
+SEGMENT_LEGACY_HASH_VARIANT = Counter(
+    "civic_archive_segment_legacy_hash_variant_total",
+    "Segments normalized with at least one None optional field, causing the legacy dedupe hash "
+    "to differ from the canonical hash. These segments may match existing records via the "
+    "legacy NOT EXISTS fallback path in insert_segments.",
+)
 ALLOWED_HTTP_METHOD_LABELS = {"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"}
 MAX_PATH_LABEL_LENGTH = 96
 

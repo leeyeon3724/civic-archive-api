@@ -5,7 +5,8 @@ import json
 from datetime import date, datetime
 from typing import Mapping, cast
 
-from app.ports.dto import SegmentRecordDTO, SegmentUpsertDTO
+from app.observability import SEGMENT_LEGACY_HASH_VARIANT
+from app.ports.dto import SegmentRecordDTO, SegmentsListQuery, SegmentUpsertDTO
 from app.ports.repositories import SegmentsRepositoryPort
 from app.ports.services import SegmentsServicePort
 from app.repositories.segments_repository import SegmentsRepository
@@ -123,6 +124,8 @@ def _normalize_segment(item: dict[str, object]) -> SegmentUpsertDTO:
     }
     normalized["dedupe_hash"] = _build_segment_dedupe_hash(normalized)
     normalized["dedupe_hash_legacy"] = _build_legacy_segment_dedupe_hash(normalized)
+    if normalized["dedupe_hash"] != normalized["dedupe_hash_legacy"]:
+        SEGMENT_LEGACY_HASH_VARIANT.inc()
     return normalized
 
 
@@ -176,38 +179,8 @@ class SegmentsService:
     def insert_segments(self, items: list[SegmentUpsertDTO]) -> int:
         return self._repository.insert_segments(items)
 
-    def list_segments(
-        self,
-        *,
-        q: str | None,
-        council: str | None,
-        committee: str | None,
-        session: str | None,
-        meeting_no: str | None,
-        importance: int | None,
-        party: str | None,
-        constituency: str | None,
-        department: str | None,
-        date_from: str | None,
-        date_to: str | None,
-        page: int,
-        size: int,
-    ) -> tuple[list[SegmentRecordDTO], int]:
-        return self._repository.list_segments(
-            q=q,
-            council=council,
-            committee=committee,
-            session=session,
-            meeting_no=meeting_no,
-            importance=importance,
-            party=party,
-            constituency=constituency,
-            department=department,
-            date_from=date_from,
-            date_to=date_to,
-            page=page,
-            size=size,
-        )
+    def list_segments(self, query: SegmentsListQuery) -> tuple[list[SegmentRecordDTO], int]:
+        return self._repository.list_segments(query)
 
     def get_segment(self, item_id: int) -> SegmentRecordDTO | None:
         return self._repository.get_segment(item_id)
@@ -240,39 +213,13 @@ def insert_segments(
 
 
 def list_segments(
+    query: SegmentsListQuery,
     *,
-    q: str | None,
-    council: str | None,
-    committee: str | None,
-    session: str | None,
-    meeting_no: str | None,
-    importance: int | None,
-    party: str | None,
-    constituency: str | None,
-    department: str | None,
-    date_from: str | None,
-    date_to: str | None,
-    page: int,
-    size: int,
     service: SegmentsServicePort | None = None,
     connection_provider: ConnectionProvider | None = None,
 ) -> tuple[list[SegmentRecordDTO], int]:
     active_service = service or build_segments_service(connection_provider=ensure_connection_provider(connection_provider))
-    return active_service.list_segments(
-        q=q,
-        council=council,
-        committee=committee,
-        session=session,
-        meeting_no=meeting_no,
-        importance=importance,
-        party=party,
-        constituency=constituency,
-        department=department,
-        date_from=date_from,
-        date_to=date_to,
-        page=page,
-        size=size,
-    )
+    return active_service.list_segments(query)
 
 
 def get_segment(

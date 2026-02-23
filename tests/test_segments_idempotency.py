@@ -1,6 +1,11 @@
 from conftest import StubResult
 
 
+# ---------------------------------------------------------------------------
+# P11-4 regression: canonical vs legacy hash inequality invariant
+# ---------------------------------------------------------------------------
+
+
 def test_normalize_segment_generates_stable_dedupe_hash(segments_module):
     first = segments_module.normalize_segment(
         {
@@ -70,3 +75,38 @@ def test_normalize_segment_blank_and_none_optional_strings_share_dedupe_hash(seg
     assert blank_normalized["dedupe_hash"] == none_normalized["dedupe_hash"]
     assert blank_normalized["dedupe_hash_legacy"] == none_normalized["dedupe_hash_legacy"]
     assert blank_normalized["dedupe_hash_legacy"] is not None
+
+
+def test_canonical_and_legacy_dedupe_hash_differ_when_optional_fields_are_none(segments_module):
+    """P11-4 invariant: when any LEGACY_EMPTY_STRING_FIELDS are None, the canonical hash
+    (which encodes None as JSON null) must differ from the legacy hash (which substitutes "").
+    This guarantees the NOT EXISTS legacy fallback path is genuinely distinct from the
+    canonical path — preventing false deduplication when both hashes happen to collide."""
+    normalized = segments_module.normalize_segment(
+        {"council": "A", "committee": None, "meeting_date": "2026-02-17"}
+    )
+    assert normalized["dedupe_hash"] != normalized["dedupe_hash_legacy"], (
+        "canonical and legacy hashes must differ when optional fields are None"
+    )
+
+
+def test_canonical_and_legacy_dedupe_hash_equal_when_no_optional_fields_are_none(segments_module):
+    """P11-4 invariant: when all LEGACY_EMPTY_STRING_FIELDS have non-None values, the legacy
+    hash substitution has no effect — canonical and legacy hashes must be identical."""
+    normalized = segments_module.normalize_segment(
+        {
+            "council": "A",
+            "committee": "Budget",
+            "session": "301",
+            "meeting_date": "2026-02-17",
+            "content": "some text",
+            "summary": "brief",
+            "subject": "finance",
+            "party": "democratic",
+            "constituency": "downtown",
+            "department": "treasury",
+        }
+    )
+    assert normalized["dedupe_hash"] == normalized["dedupe_hash_legacy"], (
+        "canonical and legacy hashes must be equal when no optional fields are None"
+    )
