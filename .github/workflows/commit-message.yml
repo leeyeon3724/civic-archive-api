@@ -29,6 +29,11 @@ jobs:
             BEFORE="${{ github.event.before }}"
             AFTER="${{ github.sha }}"
             if [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
+              # New branch push — no previous tip to range from
+              RANGE="$AFTER"
+              MAX_COUNT=1
+            elif ! git merge-base --is-ancestor "$BEFORE" "$AFTER" 2>/dev/null; then
+              # Force push — BEFORE is not an ancestor of AFTER; check only the new tip
               RANGE="$AFTER"
               MAX_COUNT=1
             else
