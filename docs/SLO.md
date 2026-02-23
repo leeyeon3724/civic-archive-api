@@ -8,14 +8,14 @@
 | 지표 | 정의 | 수식 |
 |------|------|------|
 | 가용성 | `/api/*` 성공 요청 비율 (HTTP < 500) | `1 - (5xx / total)` |
-| 지연 | `/api/*` p95 응답 시간 | `histogram_quantile(0.95, ...)` |
+| 지연 | `/api/*` 전체 p95 응답 시간 (집계) | `histogram_quantile(0.95, ...)` |
 
 ## SLO 목표
 
 | 항목 | 목표 |
 |------|------|
 | 가용성 (30일 롤링) | ≥ 99.9% |
-| 지연 (5분 윈도우 p95) | ≤ 250ms |
+| 지연 (5분 윈도우 p95, 전체 집계) | ≤ 250ms (검색 포함 목록 엔드포인트 개별 목표: `docs/PERFORMANCE.md`) |
 | Readiness | `/health/live` = 200, `/health/ready` = 200 |
 
 ## 에러 버짓 정책
@@ -38,21 +38,9 @@
 
 ## 배포 전 체크리스트
 
-```bash
-# 1. 품질 게이트
-python -m ruff check app tests scripts
-python -m pytest -q -m "not e2e and not integration" --cov=app --cov-report=term --cov-fail-under=85
-python scripts/check_docs_routes.py && python scripts/check_schema_policy.py
-python scripts/check_version_consistency.py && python scripts/check_slo_policy.py
+1. 품질 게이트 전체 통과 → [docs/TESTING.md](TESTING.md)
+2. DB 마이그레이션: `python -m alembic upgrade head`
+3. 런타임 헬스 확인: `python scripts/check_runtime_health.py --base-url <target>`
+4. 성능 회귀 확인: `BENCH_PROFILE=staging ... python scripts/benchmark_queries.py`
 
-# 2. DB 마이그레이션
-python -m alembic upgrade head
-
-# 3. 런타임 헬스 확인
-python scripts/check_runtime_health.py --base-url <target>
-
-# 4. 성능 회귀 확인
-BENCH_PROFILE=staging BENCH_FAIL_THRESHOLD_MS=250 BENCH_FAIL_P95_THRESHOLD_MS=400 python scripts/benchmark_queries.py
-```
-
-인시던트 대응 및 롤백: `docs/OPERATIONS.md` 참고
+인시던트 대응 및 롤백: [docs/OPERATIONS.md](OPERATIONS.md)

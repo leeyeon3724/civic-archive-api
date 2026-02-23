@@ -86,7 +86,7 @@ python scripts/benchmark_queries.py --profile prod --runs 40 --seed-rows 500
 | `minutes_list` | 240 | 236 | `-1.7%` |
 | `segments_list` | 280 | 295 | `+5.4%` |
 
-## Throughput Guardrails Draft
+## 처리량 가드
 
 - Batch ingest limit: `INGEST_MAX_BATCH_ITEMS` (default `200`)
 - Request size limit: `MAX_REQUEST_BODY_BYTES` (default `1,048,576`)

@@ -29,16 +29,7 @@
 
 ## 운영 점검 명령
 
-품질/정책 검사:
-
-```bash
-python -m ruff check app tests scripts
-python -m pytest -q -m "not e2e and not integration" --cov=app --cov-report=term --cov-fail-under=85
-python scripts/check_docs_routes.py
-python scripts/check_schema_policy.py
-python scripts/check_version_consistency.py
-python scripts/check_slo_policy.py
-```
+품질/정책 검사: [docs/TESTING.md](TESTING.md) 참고
 
 런타임 검사:
 

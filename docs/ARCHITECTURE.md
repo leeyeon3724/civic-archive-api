@@ -128,29 +128,36 @@ ASGI 엔트리포인트: `app.main:app`
 
 ## 주요 설계 결정
 
-- PostgreSQL upsert: `ON CONFLICT ... DO UPDATE`
-- 배치 ingest 최적화: `jsonb_to_recordset` 기반 단일 SQL 실행(뉴스/회의록 upsert, 세그먼트 insert)
-- 검색: trigram(`ILIKE` + `pg_trgm`) + FTS(`to_tsvector/websearch_to_tsquery`) 분리 전략
-- 검색 인덱스: 주요 조회 테이블별 GIN trigram index + GIN FTS index + 필터/정렬 복합 btree index
-- 목록 total: `COUNT(*)` 별도 쿼리
-- 요청/응답 검증: FastAPI + Pydantic 모델 기반으로 OpenAPI 자동 문서화
-- 에러 표준화: `code/message/error/request_id/details` 단일 포맷
-- 관측성: request-id 미들웨어, 구조화 로그, `/metrics` 메트릭 (라우트 미매칭은 `/_unmatched`, 알 수 없는 HTTP method는 `OTHER` 라벨로 고정)
-- 보안 기본선: API key 선택적 강제(`REQUIRE_API_KEY`), JWT 인증/인가(`REQUIRE_JWT` + scope/role), IP rate-limit(`RATE_LIMIT_PER_MINUTE`)
-- 분산 rate-limit: `RATE_LIMIT_BACKEND=redis`, `REDIS_URL`로 멀티 인스턴스 환경 지원
-- Redis limiter 안정화: 장애 시 쿨다운(`RATE_LIMIT_REDIS_FAILURE_COOLDOWN_SECONDS`) + fallback(`RATE_LIMIT_FAIL_OPEN`) 지원
-- 프록시 신뢰 경계: `TRUSTED_PROXY_CIDRS`에 매치되는 원격 IP에서만 `X-Forwarded-For`를 신뢰
-- 운영 strict 모드: `SECURITY_STRICT_MODE=1` 또는 `APP_ENV=production`에서 인증/호스트/CORS/rate-limit 가드 강제
-- DB 런타임 튜닝: `DB_POOL_SIZE`, `DB_MAX_OVERFLOW`, `DB_POOL_TIMEOUT_SECONDS`, `DB_CONNECT_TIMEOUT_SECONDS`, `DB_STATEMENT_TIMEOUT_MS`
-- ingest 안전 가드: `INGEST_MAX_BATCH_ITEMS`, `MAX_REQUEST_BODY_BYTES` 기반으로 oversized 요청을 `413`으로 차단
-- DB DI 최종화: 앱 상태(`app.state.connection_provider`)에서 repository까지 명시적 주입, 전역 엔진 상태 의존 제거
-- 서비스 DI: `app/services/providers.py`에서 request 단위 `get_*_service` provider를 통해 route 계층에 주입
-- 포트 분리: `app/ports/services.py`, `app/ports/repositories.py`에 Protocol 인터페이스를 모아 계층 결합도 축소
-- 타입체크 phase-2: `mypy.ini` + `scripts/check_mypy.py` (bootstrap/routes/services/ports/repositories/observability 범위 blocking)
-- 성능 회귀 체크: `scripts/benchmark_queries.py` + avg/p95 threshold 검사
-- 성능 임계값 프로파일: `docs/PERFORMANCE.md` + `scripts/benchmark_queries.py --profile <dev|staging|prod>`
-- 문서-코드 정합성: `scripts/check_docs_routes.py` + CI
-- 커밋 메시지 정책: `scripts/check_commit_messages.py` + `.github/workflows/commit-message.yml`
-- 버전 정합성: `scripts/check_version_consistency.py` + CI
-- 공급망 보안: `.github/workflows/security-supply-chain.yml` (CycloneDX SBOM + pip-audit)
-- SLO 운영 가드: `docs/SLO.md`, `docs/OPERATIONS.md`, `scripts/check_slo_policy.py`, `scripts/check_runtime_health.py`
+**데이터/쿼리**
+- upsert: `ON CONFLICT ... DO UPDATE` (뉴스/회의록); 세그먼트는 `ON CONFLICT DO NOTHING` (dedupe_hash 기반 멱등 insert)
+- 배치 ingest: `jsonb_to_recordset` 단일 SQL
+- 검색: trigram(`ILIKE`+`pg_trgm`) + FTS(`to_tsvector/websearch_to_tsquery`) 분리; GIN 인덱스(trigram/FTS) + 필터/정렬 복합 btree 인덱스
+- 페이지네이션: `COUNT(*)` 별도 쿼리 (50만 행 초과 시 keyset pagination 전환 검토 → `docs/BACKLOG.md`)
+
+**요청/응답/관측성**
+- 검증: FastAPI + Pydantic (OpenAPI 자동 문서화)
+- 에러: `{code, message, error, request_id, details}` 단일 포맷
+- 관측성: request-id 미들웨어 + JSON 구조화 로그 + `/metrics` (미매칭 경로 `/_unmatched`, 알 수 없는 method `OTHER`)
+- 요청 크기: `MAX_REQUEST_BODY_BYTES` 초과 시 `413`, `INGEST_MAX_BATCH_ITEMS` 배치 상한
+
+**보안**
+- 인증: API key(`REQUIRE_API_KEY`) + JWT/RBAC(`REQUIRE_JWT` + scope/role 분리, `JWT_ADMIN_ROLE` bypass)
+- Rate limit: IP 기준 `RATE_LIMIT_PER_MINUTE`; 다중 인스턴스는 `RATE_LIMIT_BACKEND=redis`; 장애 시 쿨다운 + `RATE_LIMIT_FAIL_OPEN`
+- 프록시: `TRUSTED_PROXY_CIDRS` 매칭 IP에서만 `X-Forwarded-For` 신뢰
+- Strict 모드: `SECURITY_STRICT_MODE=1` 또는 `APP_ENV=production`에서 인증/ALLOWED_HOSTS/CORS/rate-limit 강제
+- 시작 검증: strict + memory backend 조합 차단, 인증 미설정 경고, 기본 DB 패스워드 감지
+
+**DI/아키텍처**
+- DB: `app.state.connection_provider` 단일 소스 → repository 명시적 주입 (전역 엔진 의존 제거)
+- 서비스: `app/services/providers.py` request 단위 provider → route `Depends`
+- 포트: `app/ports/services.py`, `app/ports/repositories.py` Protocol + TypedDict DTO 계약
+- DB 튜닝: `DB_POOL_SIZE`, `DB_MAX_OVERFLOW`, `DB_POOL_TIMEOUT_SECONDS`, `DB_CONNECT_TIMEOUT_SECONDS`, `DB_STATEMENT_TIMEOUT_MS`
+
+**품질 게이트**
+- 타입: `mypy.ini` + `scripts/check_mypy.py` (phase-2 blocking)
+- 성능: `scripts/benchmark_queries.py` + avg/p95 프로파일(`dev`/`staging`/`prod`) → `docs/PERFORMANCE.md`
+- 문서 정합성: `scripts/check_docs_routes.py`
+- 커밋 정책: `scripts/check_commit_messages.py` + `.github/workflows/commit-message.yml`
+- 버전 정합성: `scripts/check_version_consistency.py`
+- 공급망: CycloneDX SBOM + pip-audit (`.github/workflows/security-supply-chain.yml`)
+- SLO/운영: `scripts/check_slo_policy.py`, `scripts/check_runtime_health.py` → `docs/SLO.md`, `docs/OPERATIONS.md`
