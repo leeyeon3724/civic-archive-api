@@ -41,15 +41,22 @@ def _as_date_input(value: object) -> str | datetime | date | None:
     raise bad_request(f"meeting_date format error (YYYY-MM-DD): {value}")
 
 
-def _canonical_json_value(value: object) -> object:
+_MAX_CANONICAL_JSON_DEPTH = 20
+
+
+def _canonical_json_value(value: object, *, _depth: int = 0) -> object:
+    if _depth > _MAX_CANONICAL_JSON_DEPTH:
+        raise bad_request(
+            f"JSONB field nesting depth exceeds maximum ({_MAX_CANONICAL_JSON_DEPTH})"
+        )
     if isinstance(value, datetime):
         return value.isoformat()
     if isinstance(value, date):
         return value.isoformat()
     if isinstance(value, list):
-        return [_canonical_json_value(item) for item in value]
+        return [_canonical_json_value(item, _depth=_depth + 1) for item in value]
     if isinstance(value, Mapping):
-        return {str(key): _canonical_json_value(value[key]) for key in sorted(value, key=str)}
+        return {str(key): _canonical_json_value(value[key], _depth=_depth + 1) for key in sorted(value, key=str)}
     return value
 
 

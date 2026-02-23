@@ -1,4 +1,33 @@
+import pytest
 from conftest import StubResult
+from fastapi import HTTPException
+
+
+# ---------------------------------------------------------------------------
+# P11-7 regression: JSONB field max nesting depth guard
+# ---------------------------------------------------------------------------
+
+
+def test_canonical_json_value_rejects_excessively_nested_input(segments_module):
+    """P11-7: _canonical_json_value must raise 400 when nesting exceeds _MAX_CANONICAL_JSON_DEPTH."""
+    limit = segments_module._MAX_CANONICAL_JSON_DEPTH
+    nested: object = "leaf"
+    for _ in range(limit + 2):
+        nested = {"child": nested}
+
+    with pytest.raises(HTTPException) as exc_info:
+        segments_module.normalize_segment({"council": "A", "tag": [nested]})
+    assert exc_info.value.status_code == 400
+
+
+def test_canonical_json_value_accepts_realistic_nesting(segments_module):
+    """P11-7: realistic nesting depth (5 levels) must not raise."""
+    nested: object = "leaf"
+    for _ in range(5):
+        nested = {"child": nested}
+
+    result = segments_module.normalize_segment({"council": "A", "tag": [nested]})
+    assert result["council"] == "A"
 
 
 # ---------------------------------------------------------------------------

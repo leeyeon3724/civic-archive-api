@@ -88,10 +88,17 @@ python scripts/benchmark_queries.py --profile prod --runs 40 --seed-rows 500
 
 ## 처리량 가드
 
-- Batch ingest limit: `INGEST_MAX_BATCH_ITEMS` (default `200`)
-- Request size limit: `MAX_REQUEST_BODY_BYTES` (default `1,048,576`)
-- Oversize fallback behavior:
-  - reject request with `413 PAYLOAD_TOO_LARGE`
-  - include `details` with configured limit and observed value
-- 운영 체크리스트 연계: `docs/OPERATIONS.md`의 Stabilize/Runtime checks 항목에서 확인
+- 배치 상한: `INGEST_MAX_BATCH_ITEMS` (기본 `200`)
+- 요청 크기 상한: `MAX_REQUEST_BODY_BYTES` (기본 `1,048,576 bytes`)
+- 초과 시: `413 PAYLOAD_TOO_LARGE` + `details`에 설정값/실제값 포함
+
+## COUNT(*) 페이지네이션 제약
+
+모든 목록 엔드포인트는 데이터 쿼리 + 전체 카운트 쿼리 2회를 실행합니다 (`app/repositories/common.py`).
+
+| 기준 | 내용 |
+|------|------|
+| 현재 위험 | `council_speech_segments` 행 수 급증 시 복합 WHERE `COUNT(*)` 지연 비선형 증가 |
+| 전환 기준 | 세그먼트 행 수 > 500,000 또는 p95 지연 SLO 위반 발생 시 keyset pagination 도입 검토 |
+| 모니터링 | 운영 정기 점검 시 세그먼트 테이블 행 수 확인 (→ `docs/OPERATIONS.md`) |
 

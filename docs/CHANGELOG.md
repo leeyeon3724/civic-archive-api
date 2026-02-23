@@ -5,6 +5,8 @@ Keep a Changelog 형식 기반. Semantic Versioning 준수.
 ## [Unreleased]
 
 ### 추가
+- JSONB 필드 중첩 깊이 가드: `_canonical_json_value`에 `_MAX_CANONICAL_JSON_DEPTH=20` 초과 시 `400` 반환(P11-7).
+- COUNT(*) 페이지네이션 제약 문서화 및 운영 모니터링 항목 추가(P11-8).
 - 계층 경계용 TypedDict DTO 모듈 (`app/ports/dto.py`).
 - 운영 보안 기본값 Docker Compose (`docker-compose.prod.yml`).
 - 검색 전략 분리: trigram(`ILIKE`+`pg_trgm`) + FTS(`to_tsvector/websearch_to_tsquery`) + GIN 인덱스.

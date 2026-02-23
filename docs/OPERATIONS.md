@@ -31,6 +31,13 @@
 
 품질/정책 검사: [docs/TESTING.md](TESTING.md) 참고
 
+정기 모니터링:
+
+```sql
+-- council_speech_segments 행 수 확인 (50만 초과 시 docs/BACKLOG.md P11-8 검토)
+SELECT COUNT(*) FROM council_speech_segments;
+```
+
 런타임 검사:
 
 ```bash
