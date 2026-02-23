@@ -50,7 +50,6 @@ services:
       API_KEY: ${API_KEY:?API_KEY is required}
       REQUIRE_JWT: "1"
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
-      JWT_ALGORITHM: HS256
       JWT_AUDIENCE: ${JWT_AUDIENCE:-}
       JWT_ISSUER: ${JWT_ISSUER:-}
       JWT_SCOPE_READ: ${JWT_SCOPE_READ:-archive:read}
@@ -58,7 +57,7 @@ services:
       JWT_SCOPE_DELETE: ${JWT_SCOPE_DELETE:-archive:delete}
       JWT_ADMIN_ROLE: ${JWT_ADMIN_ROLE:-admin}
       RATE_LIMIT_PER_MINUTE: ${RATE_LIMIT_PER_MINUTE:-120}
-      RATE_LIMIT_BACKEND: redis
+      RATE_LIMIT_BACKEND: redis  # must be "redis" — InMemoryRateLimiter is process-local and not effective across workers
       REDIS_URL: redis://redis:6379/0
       RATE_LIMIT_REDIS_PREFIX: ${RATE_LIMIT_REDIS_PREFIX:-civic_archive:rate_limit}
       RATE_LIMIT_REDIS_WINDOW_SECONDS: ${RATE_LIMIT_REDIS_WINDOW_SECONDS:-65}

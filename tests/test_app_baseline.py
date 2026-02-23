@@ -550,16 +550,22 @@ def test_jwt_configuration_rejects_short_secret(make_engine):
             )
 
 
-def test_jwt_algorithm_must_be_hs256(make_engine):
+def test_jwt_algorithm_field_removed_and_app_starts_with_hs256(make_engine):
+    # P11-5: JWT_ALGORITHM config field was removed — algorithm is hardcoded to HS256
+    # in security_jwt.py to prevent algorithm-confusion attacks. The app must start
+    # normally with a valid JWT secret and no JWT_ALGORITHM field in config.
+    from app.config import Config
+    assert not hasattr(Config.model_fields, "JWT_ALGORITHM"), (
+        "JWT_ALGORITHM must be removed from Config to prevent silent misconfiguration"
+    )
     with patch("app.database.create_engine", return_value=make_engine(lambda *_: StubResult())):
-        with pytest.raises(RuntimeError):
-            create_app(
-                build_test_config(
-                    REQUIRE_JWT=True,
-                    JWT_SECRET="test-secret-0123456789abcdefghijkl",
-                    JWT_ALGORITHM="RS256",
-                )
+        app = create_app(
+            build_test_config(
+                REQUIRE_JWT=True,
+                JWT_SECRET="test-secret-0123456789abcdefghijkl",
             )
+        )
+    assert app is not None
 
 
 def test_jwt_leeway_must_be_non_negative(make_engine):
@@ -652,6 +658,9 @@ def test_strict_security_mode_accepts_secure_configuration(make_engine):
                 ALLOWED_HOSTS="api.example.com",
                 CORS_ALLOW_ORIGINS="https://app.example.com",
                 RATE_LIMIT_PER_MINUTE=60,
+                RATE_LIMIT_BACKEND="redis",
+                REDIS_URL="redis://localhost:6379/0",
+                POSTGRES_PASSWORD="secure-password-for-strict-test",
             )
         )
     assert app is not None
